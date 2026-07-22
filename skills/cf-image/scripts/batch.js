@@ -76,6 +76,11 @@ async function main() {
   if (reported.length < results.length) {
     console.log("Some models in this batch don't report per-request neurons (e.g. phoenix) - run cost.js for the confirmed total.");
   }
+
+  if (results.length) {
+    const budgetWarning = await core.checkBudgetWarning();
+    if (budgetWarning) console.log(budgetWarning);
+  }
 }
 
 main();

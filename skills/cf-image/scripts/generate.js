@@ -76,6 +76,9 @@ async function main() {
     } else {
       console.log("Neurons used: not reported per-request for this model. Run cost.js in a few minutes for the confirmed figure.");
     }
+
+    const budgetWarning = await core.checkBudgetWarning();
+    if (budgetWarning) console.log(budgetWarning);
   } catch (e) {
     console.error(`Error: ${e.message}`);
     process.exitCode = 1;

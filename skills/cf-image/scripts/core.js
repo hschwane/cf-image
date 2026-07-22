@@ -333,6 +333,27 @@ async function getUsageToday(date) {
   };
 }
 
+async function checkBudgetWarning() {
+  // Best-effort post-generation budget check: swallow errors (e.g. the
+  // token lacks Account Analytics: Read, or analytics is lagging) rather
+  // than failing a generation that already succeeded. Returns a warning
+  // string to print, or null if there's nothing to warn about / the check
+  // itself failed.
+  try {
+    const usage = await getUsageToday();
+    if (usage.overBudget) {
+      return `Heads up: today's free allocation is exhausted (${usage.totalNeurons}/${usage.freeTierLimit} neurons) - further requests will hard-block until reset.`;
+    }
+    if (usage.nearLimit) {
+      const pct = Math.round(usage.fractionUsed * 100);
+      return `Heads up: ${pct}% of today's free allocation used (${usage.totalNeurons}/${usage.freeTierLimit} neurons).`;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function hoursUntilReset() {
   const now = new Date();
   const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
@@ -445,6 +466,7 @@ module.exports = {
   checkBudgetGate,
   generateImage,
   getUsageToday,
+  checkBudgetWarning,
   hoursUntilReset,
   verifyToken,
   listPresets,

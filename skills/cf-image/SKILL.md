@@ -119,9 +119,13 @@ Use these to steer vocabulary and composition:
   *entire* daily free allocation per image) — worth a second confirmation
   even after general opt-in to "costly."
 - Before spending on a costly model, run `node scripts/cost.js` to check
-  remaining daily budget, especially later in a session — it warns once
-  usage crosses 60% of the daily allocation. This account is on the
-  **Workers Free plan**: exceeding 10,000 neurons/day doesn't bill overage,
+  remaining daily budget, especially later in a session. `generate.js` and
+  `batch.js` also print a warning automatically right after a successful
+  generation once usage crosses 60% of the daily allocation (best-effort —
+  it won't fail the generation if the check itself can't run, e.g. missing
+  `Account Analytics: Read`) — pass that warning along to the user verbatim
+  when it shows up. This account is on the **Workers Free plan**: exceeding
+  10,000 neurons/day doesn't bill overage,
   it **hard-blocks all further Workers AI requests** (HTTP 429, code 4006)
   until reset at 00:00 UTC. If that happens, tell the user plainly and give
   the reset time — don't retry in a loop.
