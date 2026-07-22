@@ -1,0 +1,21 @@
+{
+  "name": "cf-image-marketplace",
+  "owner": {
+    "name": "hschwane"
+  },
+  "metadata": {
+    "description": "Cost-aware Cloudflare Workers AI image generation plugin"
+  },
+  "plugins": [
+    {
+      "name": "cf-image",
+      "source": "./",
+      "description": "Cost-aware image generation creative director for Cloudflare Workers AI (Flux/Leonardo). Always picks the cheapest viable model, recommends pricier ones only when the task needs it, tracks real neuron spend against the free tier.",
+      "homepage": "https://github.com/hschwane/cf-image",
+      "repository": "https://github.com/hschwane/cf-image",
+      "license": "MIT",
+      "keywords": ["image-generation", "ai-art", "cloudflare", "workers-ai", "flux"],
+      "category": "creative"
+    }
+  ]
+}
