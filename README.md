@@ -31,6 +31,30 @@ No raw script commands to memorize — this is what talking to the skill
 actually looks like. The scripts underneath are documented in "Scripts"
 below for anyone extending the plugin, but you shouldn't need them directly.
 
+## Commands
+
+The skill triggers automatically on any image request — no exact syntax
+required — but here's every capability with a natural way to ask for it.
+An explicit `/cf-image <request>` also works if you'd rather be direct
+about it.
+
+| Want to... | Say something like... |
+|---|---|
+| Generate one image | "generate a logo for my app, featuring..." |
+| Get several options to pick from | "give me 4 variations of a rocket ship icon" |
+| Control framing | "...in 16:9" / "a square icon" / "portrait/mobile format" |
+| Use a specific or higher-quality model | "use flux-2-dev for this" / "I want the best quality" — otherwise the skill recommends one and asks first, it never switches silently |
+| Check cost before generating | "how much would 3 images with the best model cost?" |
+| Check today's remaining budget | "how much of today's free budget have I used?" |
+| Save a brand/style preset | "save these brand colors and style as 'acme'" |
+| Reuse a saved preset | "generate a banner using the acme preset" |
+| List / inspect / delete presets | "what presets do I have saved?" / "delete the acme preset" |
+| Attach a reference image *(experimental)* | "using this image at `<path>` as reference, generate..." — untested against the live API, the skill will flag this when used |
+
+Each of these is backed by one of the scripts in `skills/cf-image/scripts/`
+(see "Scripts" below) — and for anyone coming from banana-claude, `SKILL.md`
+has an exact `/banana` → cf-image command-mapping table.
+
 ## Install
 
 As a Claude Code plugin, from within Claude Code:
@@ -91,8 +115,8 @@ enough to get started).
 ## Using the skill
 
 This plugin is meant to be used through its **Claude Code skill**, not by
-running the Node scripts yourself — see the Quickstart above for what that
-looks like in practice. What the skill does on every request:
+running the Node scripts yourself — see "Commands" above for everything it
+can do. What it does on every request:
 
 1. **Understands the intent** — logo vs. draft vs. final production asset —
    and asks only if genuinely ambiguous.
@@ -107,16 +131,6 @@ looks like in practice. What the skill does on every request:
 4. **Generates** a single image or a batch of variations to choose from.
 5. **Reports back** the file path, the actual prompt used, the model, and
    the real cost in neurons.
-
-It also knows how to:
-- **Reuse saved brand/style presets** (colors, typography, mood) so you
-  don't have to redescribe your brand every time — just ask it to save one
-  ("remember these brand colors as 'acme'") and reference it later.
-- **Frame the image on request** (`16:9` for a banner, `9:16` for a mobile
-  asset, etc.) instead of always producing a square.
-- **Quote a cost estimate before spending** on a pricier model, and check
-  today's free-tier budget — warning automatically if you're getting close
-  to the daily cap.
 
 Full behavioral details (the exact workflow, budget policy, and known
 model quirks) live in [`skills/cf-image/SKILL.md`](skills/cf-image/SKILL.md)
