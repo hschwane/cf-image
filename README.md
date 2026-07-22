@@ -1,15 +1,17 @@
 # cf-image
 
-A cost-aware "creative director" pipeline for generating images with
-Cloudflare Workers AI (Flux/Leonardo models), packaged as a Claude Code
-plugin. Heavily inspired by
-[banana-claude](https://github.com/AgriciDaniel/banana-claude) — see
-[NOTICE.md](NOTICE.md) for the full attribution — but targets Cloudflare's
-Workers AI instead of Gemini, runs on zero-dependency Node.js (Claude Code
-itself runs on Node, so it's guaranteed present anywhere this plugin runs),
-and is built around a **cheapest-model-first** policy: always use the
-cheapest model that will do the job, proactively recommend (never silently
-switch to) a pricier one when the task genuinely needs it.
+A cost-aware "creative director" plugin for generating images with
+Cloudflare Workers AI (Flux/Leonardo models), for Claude Code.
+
+> **Heavily inspired by [banana-claude](https://github.com/AgriciDaniel/banana-claude)**
+> by [AgriciDaniel](https://github.com/AgriciDaniel) — same "creative
+> director" pipeline shape and preset-system design, adapted here to target
+> Cloudflare Workers AI instead of Google Gemini, on zero-dependency Node.js.
+> **Full attribution: [NOTICE.md](NOTICE.md).**
+
+Built around one hard rule: **always use the cheapest model that will do the
+job, and proactively recommend — never silently switch to — a pricier one
+when a task genuinely needs it** (e.g. legible in-image text, photorealism).
 
 ## Install
 
@@ -20,89 +22,148 @@ As a Claude Code plugin, from within Claude Code:
 /plugin install cf-image@cf-image-marketplace
 ```
 
-Or clone it directly and point Claude Code at the `skills/cf-image` skill.
+Or clone the repo directly and point Claude Code at `skills/cf-image`.
 
-## Setup
+## Setup: Cloudflare account & API token
 
-Requires `CF_ACCOUNT_ID` and `CF_API_TOKEN` in the environment. The token
-needs `Workers AI: Run` permission, and `Account Analytics: Read` if you
-want `cost.js` to work. Get a token at
-https://dash.cloudflare.com/profile/api-tokens.
+You need a Cloudflare account with Workers AI access (the free tier is
+enough to get started).
 
-Run the validator first in any new environment:
+1. **Create a Cloudflare account** at https://dash.cloudflare.com/sign-up if
+   you don't have one.
+2. **Find your Account ID**: in the dashboard, select any domain/zone, or go
+   to **Workers & Pages** — the Account ID is shown in the right sidebar (or
+   in the URL: `dash.cloudflare.com/<account-id>/...`).
+3. **Create an API token** at https://dash.cloudflare.com/profile/api-tokens
+   → **Create Token** → **Create Custom Token**, with:
+   - Permission: **Workers AI → Run** (required, generates images)
+   - Permission: **Account → Account Analytics → Read** (optional but
+     recommended, needed for `cost.js`/budget checks)
+   - Account resource: scope it to your account.
+4. **Set the environment variables** so the plugin's scripts can find them:
 
-```bash
-node skills/cf-image/scripts/validate.js
-```
+   **Windows (PowerShell)**:
+   ```powershell
+   [System.Environment]::SetEnvironmentVariable("CF_ACCOUNT_ID", "<your-account-id>", "User")
+   [System.Environment]::SetEnvironmentVariable("CF_API_TOKEN", "<your-token>", "User")
+   ```
+   (restart your terminal / Claude Code session afterward so the new
+   variables are picked up)
 
-## Using it
+   **macOS / Linux (bash/zsh)** — add to `~/.bashrc`, `~/.zshrc`, or
+   `~/.profile`:
+   ```bash
+   export CF_ACCOUNT_ID="<your-account-id>"
+   export CF_API_TOKEN="<your-token>"
+   ```
+   then `source` that file or open a new terminal.
 
-Either invoke the `cf-image` skill from Claude Code (it reads `SKILL.md` and
-the `references/` docs, and knows how to craft prompts, pick models, and
-enforce the budget policy), or call the scripts directly:
+   **Cloud/CI environments**: set them as secrets/environment variables in
+   whatever mechanism that environment provides (they just need to be
+   present in the process environment Claude Code runs in).
 
-```bash
-# See all models, tiers, measured pricing, and researched strengths/weaknesses
-node skills/cf-image/scripts/models.js
+5. **Verify it worked**:
+   ```bash
+   node skills/cf-image/scripts/validate.js
+   ```
+   This checks both env vars are set and that the token can actually reach
+   the Cloudflare API, and reports which permissions are missing if any
+   check fails.
 
-# Generate one image on the cheapest model (klein4b, currently 0 neurons)
-node skills/cf-image/scripts/generate.js --prompt "a coral-colored octopus mascot logo"
+## Using the skill
 
-# Generate a few variations to pick from (defaults to the cheapest model)
-node skills/cf-image/scripts/batch.js --prompt "a coral-colored octopus mascot logo" --count 4
+This plugin is meant to be used through its **Claude Code skill**, not by
+running the Node scripts yourself — just ask Claude for an image and it
+handles prompt crafting, model selection, and cost tracking for you:
 
-# Use a paid/expensive model - requires explicit opt-in
-node skills/cf-image/scripts/generate.js --prompt "..." --model lucid --allow-expensive
+> "generate a logo for my app called Octofood, a food/recipe/grocery
+> planner, featuring a cute octopus"
+>
+> "give me a few variations of a rocket ship icon"
+>
+> "make this a photorealistic product shot" *(the skill will suggest a
+> pricier, better-suited model here rather than defaulting silently)*
 
-# Save and reuse a brand/style preset
-node skills/cf-image/scripts/presets.js create tech-saas --style "flat vector, soft shadows" --colors "#2563EB,#F8FAFC"
-node skills/cf-image/scripts/generate.js --prompt "a rocket icon" --preset tech-saas
+What the skill does on every request:
 
-# Check today's actual neuron usage and remaining free budget
-node skills/cf-image/scripts/cost.js
-```
+1. **Understands the intent** — logo vs. draft vs. final production asset —
+   and asks only if genuinely ambiguous.
+2. **Crafts a proper prompt** from a terse request, using a domain lens
+   (Logo/Icon, Product/UI, Illustration, Photoreal/Cinematic, Landscape) to
+   steer vocabulary and composition.
+3. **Picks the cheapest model that will work** — currently `klein4b`,
+   falling back to `schnell` if needed — and only recommends a pricier model
+   when the task has a real need the cheap models are known to be weak at
+   (legible text, close-range photorealism, complex composition). It always
+   asks before spending on anything beyond the cheap tier.
+4. **Generates** a single image or a batch of variations to choose from.
+5. **Reports back** the file path, the actual prompt used, the model, and
+   the real cost in neurons.
 
-Generated images land in `~/.cf-image/output/` (override with
-`CF_IMAGE_HOME`), named `<timestamp>-<model>-<prompt-slug>.jpg` — not inside
-the plugin's own installed directory, so this works the same whether cloned
-locally or installed via the marketplace. Presets live in
-`~/.cf-image/presets/`.
+It also knows how to:
+- **Reuse saved brand/style presets** (colors, typography, mood) so you
+  don't have to redescribe your brand every time — just ask it to save one
+  ("remember these brand colors as 'acme'") and reference it later.
+- **Check today's free-tier budget** before spending on a pricier model, and
+  warn if you're getting close to the daily cap.
+
+Full behavioral details (the exact workflow, budget policy, and known
+model quirks) live in [`skills/cf-image/SKILL.md`](skills/cf-image/SKILL.md)
+and [`skills/cf-image/references/`](skills/cf-image/references/) — worth a
+read if you want to understand *why* it makes the choices it does, or if
+you're extending the plugin.
 
 ## Model tiers
 
+`tier` is **relative cost within Workers AI**, not a free-plan-vs-paid-plan
+distinction — every model draws from the same shared account-wide free daily
+allocation (10,000 neurons/day, resets 00:00 UTC).
+
 | Tier | Models | Behavior |
 |---|---|---|
-| Free | `klein4b` (default), `schnell` | Run with no confirmation |
-| Paid | `klein9b`, `phoenix`, `lucid` | Blocked unless `--allow-expensive` is passed |
-| Expensive | `dev` | Same gate; ~75% of the entire daily free budget per image |
+| Cheap | `klein4b` (default), `schnell` | Used automatically, no confirmation |
+| Costly | `klein9b`, `phoenix`, `lucid`, `dev` | Requires explicit opt-in (the skill asks first; `dev` alone is ~75% of the daily allocation per image) |
 
 Full pricing detail, measured quirks (multipart requirements, a raw-binary
-response format, a safety-filter false positive on `klein4b`, etc.),
+response format, a safety-filter false positive on `klein4b`, and why its
+0-cost is flagged as a likely pricing bug rather than a real free model),
 researched strengths/weaknesses per model, and prompting guidance live in
-`skills/cf-image/references/`.
+[`skills/cf-image/references/`](skills/cf-image/references/).
+
+## Scripts (for reference — the skill drives these for you)
+
+| Script | Purpose |
+|---|---|
+| `validate.js` | Check env vars + API access work in this environment |
+| `generate.js` | Generate one image |
+| `batch.js` | Generate N variations of one prompt |
+| `models.js` | List models, tiers, pricing, strengths/weaknesses |
+| `cost.js` | Today's neuron usage, remaining free budget, 60%-used warning |
+| `presets.js` | Manage saved brand/style presets |
+
+All zero-dependency Node.js (built-ins only — `fetch`, `FormData`, `fs`,
+`path`, `os`; no `npm install` step). Full usage/flags for each are
+documented in [`SKILL.md`](skills/cf-image/SKILL.md).
 
 ## Known limitations
 
-- **The account this was built against is on the Workers Free plan.**
-  Exceeding 10,000 neurons/day across ALL models hard-blocks further
-  requests (HTTP 429) until 00:00 UTC reset — it does not bill overage.
-  `cost.js` reports both what happens on Free vs. what it would cost on Paid.
-- The daily quota was exhausted from earlier manual testing while this
-  toolkit was built, so a full successful generate-and-save round trip
-  through these exact scripts hasn't been re-verified after a quota reset —
-  though every code path up to that point (both JSON and multipart request
-  construction, budget-gate blocking, error parsing, the specific
-  "daily allocation exhausted" error) has been live-tested against the real
-  API and works correctly. Worth running one real test generation after
-  reset to confirm the save-to-disk path too.
-- No image editing / img2img / reference-image support yet (see
-  `skills/cf-image/SKILL.md` for why — mainly: untested against the live
-  API, so not worth shipping half baked).
+- The daily free-tier cap was hit during development, so a full
+  generate-and-save round trip hasn't been re-verified end-to-end after a
+  quota reset yet — everything up to that point (both request formats,
+  budget-gate blocking, error handling, the specific "daily allocation
+  exhausted" error) has been live-tested against the real API and works.
+  Re-testing is planned once quota allows.
+- **Reference-image conditioning** (`--reference-image`, for
+  `klein4b`/`klein9b`/`dev`) is implemented but has never been exercised
+  against the live API — treat it as experimental until confirmed. See
+  `skills/cf-image/references/models.md`.
 - `google/nano-banana-2-lite` (Google, via AI Gateway) is documented but not
   wired up — it's a separate billing system (gateway balance/BYOK) outside
-  Workers AI neurons, and this account doesn't have gateway balance set up.
+  Workers AI neurons.
+- No multi-turn "chat" sessions or a bundled prompt-idea database — see
+  `SKILL.md`'s "Not implemented" section for why.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). See [NOTICE.md](NOTICE.md) for attribution to
-banana-claude, which this project is heavily inspired by.
+MIT, see [LICENSE](LICENSE). See [NOTICE.md](NOTICE.md) for full attribution
+to banana-claude, which this project is heavily inspired by.

@@ -48,6 +48,10 @@ async function main() {
     console.log(`On Workers PAID plan this would instead bill ~$${cost.toFixed(4)} as overage ($0.011/1,000 neurons) and continue working.`);
   } else {
     console.log(`Remaining free budget: ${usage.remaining} neurons`);
+    if (usage.nearLimit) {
+      const pct = Math.round(usage.fractionUsed * 100);
+      console.log(`WARNING: ${pct}% of today's free allocation used - getting close to the ${usage.freeTierLimit}-neuron daily cap.`);
+    }
   }
 
   const hoursLeft = core.hoursUntilReset();

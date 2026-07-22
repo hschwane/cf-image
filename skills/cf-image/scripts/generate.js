@@ -7,13 +7,15 @@
  *   node generate.js --prompt "a coral-colored octopus mascot logo"
  *   node generate.js --prompt "..." --model lucid --allow-expensive
  *   node generate.js --prompt "..." --preset tech-saas
+ *   node generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
+ *     (EXPERIMENTAL/UNTESTED - see references/models.md)
  */
 const path = require("path");
 const core = require("./core");
 const { parseFlags } = require("./cli-args");
 
 async function main() {
-  const args = parseFlags(process.argv.slice(2), ["allow-expensive"]);
+  const args = parseFlags(process.argv.slice(2), ["allow-expensive"], ["reference-image"]);
 
   if (!args.prompt) {
     console.error("Error: --prompt is required");
@@ -44,6 +46,10 @@ async function main() {
 
   const width = args.width ? parseInt(args.width, 10) : 1024;
   const height = args.height ? parseInt(args.height, 10) : 1024;
+  const referenceImagePaths = args["reference-image"] || [];
+  if (referenceImagePaths.length) {
+    console.log(`WARNING: reference-image support is experimental/untested (${referenceImagePaths.length} image(s) attached). Report back if this works or fails.`);
+  }
 
   let outFile = args["out-file"];
   if (!outFile) {
@@ -59,6 +65,7 @@ async function main() {
       height,
       outFile,
       allowExpensive: !!args["allow-expensive"],
+      referenceImagePaths,
     });
 
     console.log(`Saved: ${result.outFile}`);

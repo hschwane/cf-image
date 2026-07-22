@@ -9,7 +9,8 @@ specific models.
 ## Free tier mechanics
 
 - 10,000 neurons/day shared across **all** Workers AI models on the account,
-  resets 00:00 UTC.
+  resets 00:00 UTC. This is an account-wide allocation, not a per-model
+  thing — see "A note on tier naming" below.
 - This account is on the **Workers Free plan**. Confirmed by hitting the cap
   live: further requests return **HTTP 429, error code 4006**
   ("you have used up your daily free allocation... please upgrade to
@@ -19,39 +20,65 @@ specific models.
 - Check current usage with `node scripts/cost.js` — it queries the
   `aiInferenceAdaptiveGroups` GraphQL Analytics dataset, which needs an API
   token with `Account Analytics: Read`. Analytics lags real-time usage by a
-  few minutes.
+  few minutes. It warns once usage crosses 60% of the daily allocation.
+
+## A note on tier naming
+
+The catalog below labels each model `cheap` or `costly`. This is **relative
+cost within Workers AI**, not a "free plan vs. paid plan" distinction —
+every model listed here draws from the same shared account-wide free daily
+allocation described above. A "costly" model is still fully usable on the
+Workers Free plan; it just consumes the shared 10,000-neuron budget faster.
+Don't describe any of these models as "not free-tier" — that's not accurate.
 
 ## Model catalog
 
 | Key | Model ID | Tier | Neurons / 1024px image (measured) | Request format | Response format |
 |---|---|---|---|---|---|
-| `schnell` | `@cf/black-forest-labs/flux-1-schnell` | Free | 19.2 | JSON body | JSON, base64 `result.image` |
-| `klein4b` | `@cf/black-forest-labs/flux-2-klein-4b` | Free | **0** | multipart/form-data | JSON, base64 |
-| `klein9b` | `@cf/black-forest-labs/flux-2-klein-9b` | Paid | 1,363.64 | multipart/form-data | JSON, base64 |
-| `phoenix` | `@cf/leonardo/phoenix-1.0` | Paid | 3,120 | JSON body | **raw binary** (`Content-Type: image/jpeg`), no JSON wrapper |
-| `lucid` | `@cf/leonardo/lucid-origin` | Paid | 3,904.69 | JSON body | JSON, base64 |
-| `dev` | `@cf/black-forest-labs/flux-2-dev` | Expensive | 7,500 | multipart/form-data | JSON, base64 |
+| `schnell` | `@cf/black-forest-labs/flux-1-schnell` | cheap | 19.2 | JSON body | JSON, base64 `result.image` |
+| `klein4b` | `@cf/black-forest-labs/flux-2-klein-4b` | cheap | **0** (see caveat below) | multipart/form-data | JSON, base64 |
+| `klein9b` | `@cf/black-forest-labs/flux-2-klein-9b` | costly | 1,363.64 | multipart/form-data | JSON, base64 |
+| `phoenix` | `@cf/leonardo/phoenix-1.0` | costly | 3,120 | JSON body | **raw binary** (`Content-Type: image/jpeg`), no JSON wrapper |
+| `lucid` | `@cf/leonardo/lucid-origin` | costly | 3,904.69 | JSON body | JSON, base64 |
+| `dev` | `@cf/black-forest-labs/flux-2-dev` | costly | 7,500 | multipart/form-data | JSON, base64 |
 
 USD equivalents (Workers Paid plan overage rate, $0.011/1,000 neurons):
 schnell ≈ $0.0002, klein9b ≈ $0.0150, phoenix ≈ $0.0343, lucid ≈ $0.0430,
-dev ≈ $0.0825 per image.
+dev ≈ $0.0825 per image. `dev` is disproportionately pricier than the other
+three "costly" models — ~75% of the entire daily free allocation per image.
+
+## `klein4b`'s 0-neuron cost: suspected bug, not confirmed free
+
+`klein4b` has measured **0 neurons billed** across every call so far (both
+the per-request `cf-ai-neurons` header and next-day GraphQL analytics agree).
+That said, this is treated as **suspicious, not trustworthy**: `klein4b` is a
+newer, better FLUX.2-generation model than `schnell`, and it doesn't make
+architectural/business sense for it to be priced *below* an older, smaller
+model. The likely explanation is a promotional launch rate or a metering bug
+on Cloudflare's side, not an intentional permanent free model.
+
+Practical implications:
+- It's fine to keep as the toolkit's default — it's the cheapest option
+  *today*, and worst case it's the same order of magnitude as `schnell`.
+- Don't build anything that assumes this will remain 0 forever. Re-check
+  `node scripts/cost.js` periodically. If `klein4b` ever reports nonzero
+  neurons, treat `schnell` as the new default and update
+  `CHEAPEST_MODEL_KEY` in `scripts/core.js` accordingly.
+- Don't report to a user "this model is free" as if that's an intentional,
+  stable property — say "currently billing 0 neurons" instead.
 
 ## Per-model quirks discovered by testing
 
-- **`schnell`**: plain JSON POST, no surprises. Good default.
+- **`schnell`**: plain JSON POST, no surprises. Good fallback when
+  `klein4b`'s safety filter blocks a prompt.
 - **`klein4b`**: a JSON body request returns HTTP 400
   `"required properties at '/' are 'multipart'"` — it *only* accepts
   multipart/form-data (fields: `prompt`, `width`, `height`, and optionally
-  `input_image_0`..`input_image_3` for reference images, per Cloudflare
-  changelog — untested here). Its safety filter also false-positived on the
-  literal phrase "training kung fu" (error code 3030, "output has been
-  flagged") while "practicing kung fu martial arts moves" for the same
-  subject passed fine. Reword rather than retry identically on a 3030.
-  Its neuron cost measured 0 across multiple separate calls, both via the
-  per-request `cf-ai-neurons` header and via GraphQL analytics the next day
-  — consistent enough to treat as free-tier, but this looks like a
-  promotional/launch rate for a new model, not a permanent guarantee. If it
-  starts reporting nonzero neurons, move it to the Paid tier in the catalog.
+  `input_image_0`..`input_image_3` for reference images — see "Reference
+  images" below). Its safety filter also false-positived on the literal
+  phrase "training kung fu" (error code 3030, "output has been flagged")
+  while "practicing kung fu martial arts moves" for the same subject passed
+  fine. Reword rather than retry identically on a 3030.
 - **`klein9b`**: same multipart requirement as klein4b. Pricing is a flat
   per-megapixel rate (not per-tile), confirmed via header
   (`cf-ai-neurons: 1363.64`, exactly matching Cloudflare's documented
@@ -72,6 +99,25 @@ dev ≈ $0.0825 per image.
   count (if exposed) would change the price. By far the most expensive
   model tested — almost 6x `lucid-origin` and ~390x `schnell`.
 
+## Reference images (experimental, implemented but untested)
+
+`scripts/core.js` / `scripts/generate.js` support attaching up to 4
+reference images (`--reference-image`, repeatable), sent as multipart fields
+`input_image_0`..`input_image_3`. This is how Cloudflare's changelog
+documents multi-reference conditioning for `klein4b` (and, by family
+similarity, presumably `klein9b`/`dev` — untested); the same mechanism is
+also how "edit this image" style requests should work, since these are
+unified generation/editing models with no separate edit endpoint.
+
+**Status: implemented, never actually exercised against the live API.** The
+client-side request construction (reading file bytes, attaching as a `Blob`
+with a guessed MIME type, gating to only multipart-format models) has been
+verified to build correctly and reach the network, but the daily quota was
+exhausted before a real end-to-end test could confirm the server accepts
+this shape or what it returns. Whoever runs this next: try it, and update
+this section with what actually happened (works as expected / different
+field names needed / different response shape / etc).
+
 ## Researched characteristics (strengths / weaknesses / use cases)
 
 Unlike the pricing/quirks above, this section is **not** measured by us —
@@ -89,10 +135,9 @@ fits a task, not just which is cheapest.
 - **`klein4b`** (FLUX.2 [klein] 4B, Apache-2.0, ~4B transformer + Qwen3-4B
   text encoder, fixed 4-step inference): the FLUX.2-generation equivalent of
   schnell — cheapest/fastest FLUX.2 tier, unifies text-to-image and
-  image-editing/multi-reference in one model (editing not wired up in this
-  toolkit yet — see "Not implemented" in SKILL.md). Visibly softer fine
-  detail and less reliable text than `klein9b`. Best for: real-time/
-  interactive iteration, drafts, sub-second turnaround.
+  image-editing/multi-reference in one model (see "Reference images" above).
+  Visibly softer fine detail and less reliable text than `klein9b`. Best
+  for: real-time/interactive iteration, drafts, sub-second turnaround.
 - **`klein9b`** (FLUX.2 [klein] 9B, 9B transformer + Qwen3-8B text encoder,
   step-distilled to 4 steps): the standout value tier — blind-preference ELO
   testing puts it only ~9 points behind full FLUX.2 [dev] (1134 vs 1143),
@@ -132,7 +177,7 @@ fits a task, not just which is cheapest.
 `phoenix` if budget-conscious). Need photorealistic people/products/
 architecture? → `lucid`. Need a complex composition followed precisely? →
 `phoenix`. Otherwise, iterate with `klein4b`/`schnell` and only spend on a
-paid model once the concept is locked.
+costlier model once the concept is locked.
 
 Sources: Black Forest Labs FLUX.2 blog posts (bfl.ai/blog), Cloudflare
 Workers AI model docs and pricing page, SiliconFlow/MimicPC/ImageGPT/
@@ -157,11 +202,6 @@ vendor marketing copy, not independently reproduced benchmarks.
   `dreamshaper-8-lcm` — present in the account's model catalog but not
   priced or request-tested this session. Don't assume their request/response
   shape matches any of the models above without testing first.
-- **Image editing / img2img / multi-reference.** Cloudflare's changelog
-  documents `input_image_0` through `input_image_3` multipart fields for
-  `klein4b`/`klein9b`/`dev` (reference-image conditioning), but this hasn't
-  been exercised against the live API by us — don't implement or claim
-  support for it without testing the actual request/response shape first.
 - **Multi-turn "chat" sessions** and a large "inspire" prompt-idea database
   — both present in banana-claude (the plugin this toolkit is modeled on,
   see NOTICE.md) but deliberately not ported. Cloudflare Workers AI has no
