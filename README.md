@@ -13,6 +13,24 @@ Built around one hard rule: **always use the cheapest model that will do the
 job, and proactively recommend — never silently switch to — a pricier one
 when a task genuinely needs it** (e.g. legible in-image text, photorealism).
 
+## Quickstart
+
+Once installed (see "Install" below) and your Cloudflare token is set up
+(see "Setup"), just ask — the skill handles prompt crafting, model choice,
+and cost tracking for you:
+
+```
+"generate a logo for my app, a weather widget, featuring a friendly cloud mascot"
+"give me 4 variations of a rocket ship icon"
+"save these brand colors as 'acme': #FF6B00 and #111111"
+"now make a hero banner using the acme preset, 16:9"
+"how much of today's free budget have I used?"
+```
+
+No raw script commands to memorize — this is what talking to the skill
+actually looks like. The scripts underneath are documented in "Scripts"
+below for anyone extending the plugin, but you shouldn't need them directly.
+
 ## Install
 
 As a Claude Code plugin, from within Claude Code:
@@ -73,18 +91,8 @@ enough to get started).
 ## Using the skill
 
 This plugin is meant to be used through its **Claude Code skill**, not by
-running the Node scripts yourself — just ask Claude for an image and it
-handles prompt crafting, model selection, and cost tracking for you:
-
-> "generate a logo for my app, a weather widget, featuring a friendly cloud
-> mascot"
->
-> "give me a few variations of a rocket ship icon"
->
-> "make this a photorealistic product shot" *(the skill will suggest a
-> pricier, better-suited model here rather than defaulting silently)*
-
-What the skill does on every request:
+running the Node scripts yourself — see the Quickstart above for what that
+looks like in practice. What the skill does on every request:
 
 1. **Understands the intent** — logo vs. draft vs. final production asset —
    and asks only if genuinely ambiguous.
@@ -104,8 +112,11 @@ It also knows how to:
 - **Reuse saved brand/style presets** (colors, typography, mood) so you
   don't have to redescribe your brand every time — just ask it to save one
   ("remember these brand colors as 'acme'") and reference it later.
-- **Check today's free-tier budget** before spending on a pricier model, and
-  warn if you're getting close to the daily cap.
+- **Frame the image on request** (`16:9` for a banner, `9:16` for a mobile
+  asset, etc.) instead of always producing a square.
+- **Quote a cost estimate before spending** on a pricier model, and check
+  today's free-tier budget — warning automatically if you're getting close
+  to the daily cap.
 
 Full behavioral details (the exact workflow, budget policy, and known
 model quirks) live in [`skills/cf-image/SKILL.md`](skills/cf-image/SKILL.md)
@@ -135,11 +146,11 @@ researched strengths/weaknesses per model, and prompting guidance live in
 | Script | Purpose |
 |---|---|
 | `validate.js` | Check env vars + API access work in this environment |
-| `generate.js` | Generate one image |
+| `generate.js` | Generate one image (supports `--aspect-ratio`, `--preset`, experimental `--reference-image`) |
 | `batch.js` | Generate N variations of one prompt |
 | `models.js` | List models, tiers, pricing, strengths/weaknesses |
-| `cost.js` | Today's neuron usage, remaining free budget, 60%-used warning |
-| `presets.js` | Manage saved brand/style presets |
+| `cost.js` | `today` (default): usage + remaining budget, warns at 60% used. `estimate --model <key> --count <n>`: cost of a planned generation, no API call |
+| `presets.js` | Manage saved brand/style presets (`list`/`show`/`create`/`delete`) |
 
 All zero-dependency Node.js (built-ins only — `fetch`, `FormData`, `fs`,
 `path`, `os`; no `npm install` step). Full usage/flags for each are

@@ -7,6 +7,7 @@
  *   node generate.js --prompt "a coral-colored octopus mascot logo"
  *   node generate.js --prompt "..." --model lucid --allow-expensive
  *   node generate.js --prompt "..." --preset tech-saas
+ *   node generate.js --prompt "..." --aspect-ratio 16:9
  *   node generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
  *     (EXPERIMENTAL/UNTESTED - see references/models.md)
  */
@@ -44,8 +45,15 @@ async function main() {
     }
   }
 
-  const width = args.width ? parseInt(args.width, 10) : 1024;
-  const height = args.height ? parseInt(args.height, 10) : 1024;
+  let width, height;
+  try {
+    ({ width, height } = core.resolveDimensions({ width: args.width, height: args.height, aspectRatio: args["aspect-ratio"] }));
+  } catch (e) {
+    console.error(`Error: ${e.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
   const referenceImagePaths = args["reference-image"] || [];
   if (referenceImagePaths.length) {
     console.log(`WARNING: reference-image support is experimental/untested (${referenceImagePaths.length} image(s) attached). Report back if this works or fails.`);

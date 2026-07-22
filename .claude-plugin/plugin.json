@@ -1,6 +1,6 @@
 {
   "name": "cf-image",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cost-aware image generation creative director for Cloudflare Workers AI (Flux/Leonardo). Always picks the cheapest viable model, recommends pricier ones only when the task needs it, tracks real neuron spend against the free tier.",
   "author": {
     "name": "Hendrik Schwanekamp",

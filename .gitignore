@@ -2,3 +2,7 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local dev-only symlink so the skill auto-loads in this project without
+# going through the marketplace install flow. Not part of the shipped plugin.
+.claude/

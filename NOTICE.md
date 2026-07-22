@@ -34,6 +34,21 @@ following ideas were directly adapted from banana-claude's design:
 - **A local `validate`-style setup-check script** — inspired by
   banana-claude's `validate_setup.py`, adapted here to check Cloudflare
   credentials/permissions instead of an MCP server configuration.
+- **A cost `estimate` mode** — banana-claude's README documents
+  `/banana cost [summary|today|estimate]`; cf-image's `cost.js estimate
+  --model <key> --count <n>` adapts the "estimate before you spend" idea
+  (computed locally from measured pricing, no API call) as a `today`/
+  `estimate` subcommand split. The `summary` (multi-day history) mode was
+  not adapted — cf-image relies on Cloudflare's own GraphQL Analytics for
+  ground truth rather than a local usage ledger.
+- **`--aspect-ratio` shorthand** — banana-claude's README advertises "14
+  aspect ratio options"; cf-image adapts the convenience (a ratio string
+  instead of raw pixel dimensions) generically via `core.parseAspectRatio`
+  rather than a fixed list, computed client-side and untested beyond the
+  1024x1024 default — see `skills/cf-image/SKILL.md`.
+- **README Quickstart style** — the fenced-code-block "install then try
+  these commands" format in this README's Quickstart section follows
+  banana-claude's README structure.
 
 What's original to cf-image, not adapted from banana-claude:
 

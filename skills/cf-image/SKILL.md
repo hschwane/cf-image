@@ -72,11 +72,12 @@ shared budget faster.
      model is known to be weak at (see each model's `best_for`/`weaker_for`
      in `references/models.md` — e.g. legible in-image text, close-range
      photorealism, complex multi-constraint composition). If so, **say so and
-     recommend the better-suited model with its cost**, e.g. "klein4b/schnell
-     tend to garble in-image text — flux-2-dev (~$0.08/image) renders it
-     properly, want me to use that instead?" Then proceed with whatever the
-     user confirms. Never silently substitute a costlier model for what was
-     asked.
+     recommend the better-suited model with its cost**. Get the exact figure
+     with `node scripts/cost.js estimate --model dev --count 1` rather than
+     quoting a remembered number — e.g. "klein4b/schnell tend to garble
+     in-image text — flux-2-dev renders it properly, ~$0.08/image, want me to
+     use that instead?" Then proceed with whatever the user confirms. Never
+     silently substitute a costlier model for what was asked.
    - If the user already named a costly model or said "best quality" /
      "final" / "production-ready" explicitly, that counts as opt-in — no
      need to ask again, just confirm cost before spending if it's `dev`
@@ -108,6 +109,11 @@ Use these to steer vocabulary and composition:
   hour"). Recommend `lucid` for this lens if the cheap-tier draft isn't
   convincing enough.
 - **Landscape/Environment** — establish scale, time of day, weather/mood.
+
+Pick framing with `--aspect-ratio` when it matters for the use case (e.g.
+`16:9` for a blog header, `9:16` for a mobile/story asset, `1:1` — the
+default — for an icon or square social post) rather than leaving everything
+at 1024x1024. See "Aspect ratios" below for the caveat on this.
 
 ## Budget policy (hard rule)
 
@@ -148,6 +154,9 @@ node scripts/generate.js --prompt "..."
 # Single image, costly-tier model (only after user opts in)
 node scripts/generate.js --prompt "..." --model lucid --allow-expensive
 
+# Custom framing instead of the 1024x1024 default (see "Aspect ratios" below)
+node scripts/generate.js --prompt "..." --aspect-ratio 16:9
+
 # N variations for the user to pick from (defaults to the cheapest model)
 node scripts/batch.js --prompt "..." --count 4
 
@@ -161,9 +170,36 @@ node scripts/presets.js create tech-saas --style "..." --colors "#2563EB,#F8FAFC
 # Today's real neuron usage + remaining free budget (warns at 60% used)
 node scripts/cost.js
 
+# Estimate a generation's cost BEFORE spending anything (no API call)
+node scripts/cost.js estimate --model dev --count 3
+
 # EXPERIMENTAL/UNTESTED - reference-image conditioning, klein4b/klein9b/dev only
 node scripts/generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
 ```
+
+### Aspect ratios
+
+`--aspect-ratio W:H` (e.g. `16:9`, `9:16`, `4:3`, `21:9`) is a convenience
+shorthand computed client-side — it targets roughly the same total pixel
+count as the 1024x1024 default, rounded to multiples of 64. Mutually
+exclusive with `--width`/`--height` (pass one or the other, not both). Only
+square 1024x1024 has actually been exercised against the live API — other
+ratios/resolutions are untested per-model, same status as reference images
+below. Mention this if a user asks and the result looks off.
+
+### Command reference vs. banana-claude
+
+For anyone familiar with banana-claude's `/banana` commands, here's how they
+map (see `NOTICE.md` for what was directly adapted vs. built independently):
+
+| banana-claude | cf-image equivalent |
+|---|---|
+| `/banana generate <idea>` | `generate.js` (skill crafts the prompt first) |
+| `/banana batch <idea> [N]` | `batch.js --count N` |
+| `/banana preset [list\|create\|show\|delete]` | `presets.js` — same subcommands |
+| `/banana cost [today\|estimate]` | `cost.js today` (default) / `cost.js estimate` |
+| `/banana edit <path> <instructions>` | reference-image conditioning (experimental, see below) — no separate edit path |
+| `/banana chat`, `/banana inspire`, `/banana setup` | not ported — see "Not implemented" |
 
 All generated images are saved under `~/.cf-image/output/` (override with
 `CF_IMAGE_HOME`) with a timestamp, model key, and a slug of the prompt in the

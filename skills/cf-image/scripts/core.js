@@ -127,6 +127,56 @@ function slugify(text, maxLen = 40) {
   return (slug || "image").slice(0, maxLen);
 }
 
+// Convenience shorthand for --aspect-ratio "W:H", e.g. "16:9" or "9:16".
+// Targets roughly the same total pixel count as the 1024x1024 default
+// (~1.05MP), rounded to multiples of 64 (the usual diffusion-model
+// dimension constraint). NOTE: only 1024x1024 has actually been exercised
+// against the live API this session - other resolutions/ratios are
+// untested per-model, same caveat as reference images.
+function parseAspectRatio(ratioStr) {
+  const m = /^(\d+):(\d+)$/.exec(ratioStr);
+  if (!m) throw new CfImageError(`Invalid --aspect-ratio '${ratioStr}' - expected format like '16:9'.`);
+  const w = parseInt(m[1], 10);
+  const h = parseInt(m[2], 10);
+  if (w <= 0 || h <= 0) throw new CfImageError(`Invalid --aspect-ratio '${ratioStr}' - both sides must be positive.`);
+
+  const targetPixels = 1024 * 1024;
+  const scale = Math.sqrt(targetPixels / (w * h));
+  const round64 = (n) => Math.max(256, Math.round((n * scale) / 64) * 64);
+  return { width: round64(w), height: round64(h) };
+}
+
+// Shared by generate.js/batch.js: explicit --width/--height wins if given,
+// otherwise --aspect-ratio if given, otherwise the 1024x1024 default.
+function resolveDimensions({ width, height, aspectRatio }) {
+  if (aspectRatio && (width || height)) {
+    throw new CfImageError("Pass either --aspect-ratio or --width/--height, not both.");
+  }
+  if (aspectRatio) return parseAspectRatio(aspectRatio);
+  return {
+    width: width ? parseInt(width, 10) : 1024,
+    height: height ? parseInt(height, 10) : 1024,
+  };
+}
+
+// Pure math, no API call - lets the skill quote a cost before spending.
+// `dev` is billed per-step so this uses the same measured default-step
+// figure as everywhere else in this file; actual cost may differ if a
+// different step count is ever exposed.
+function estimateCost(modelKey, count = 1) {
+  const entry = getModel(modelKey);
+  const neurons = entry.neuronsPer1024 * count;
+  return {
+    model: modelKey,
+    modelId: entry.id,
+    tier: entry.tier,
+    count,
+    neurons: Math.round(neurons * 100) / 100,
+    usd: Math.round(((neurons / 1000) * OVERAGE_RATE_PER_1000) * 10000) / 10000,
+    fractionOfDailyBudget: Math.round((neurons / FREE_DAILY_NEURONS) * 1000) / 1000,
+  };
+}
+
 function cfImageHome() {
   return process.env.CF_IMAGE_HOME || path.join(os.homedir(), ".cf-image");
 }
@@ -459,6 +509,9 @@ module.exports = {
   CHEAPEST_MODEL_KEY,
   CfImageError,
   slugify,
+  parseAspectRatio,
+  resolveDimensions,
+  estimateCost,
   cfImageHome,
   defaultOutputDir,
   presetsDir,

@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.3.0 — 2026-07-23
+
+- Added `cost.js estimate --model <key> --count <n>`: quotes a generation's
+  cost before spending anything (no API call), adapted from banana-claude's
+  `/banana cost estimate` mode. `cost.js` (bare/`today`) still works as
+  before.
+- Added `--aspect-ratio W:H` shorthand on `generate.js`/`batch.js` (e.g.
+  `16:9`, `9:16`), computed client-side against the 1024x1024 default pixel
+  budget; mutually exclusive with `--width`/`--height`. Untested beyond
+  square resolutions - flagged as such in the docs.
+- Added a post-generation budget warning: `generate.js`/`batch.js` now warn
+  automatically once usage crosses 60% of the daily allocation, right after
+  a successful generation, not just when separately running `cost.js`.
+- README: added a Quickstart section (adapted from banana-claude's README
+  structure) and a command-reference comparison table against banana-claude
+  in `SKILL.md`; removed a private project name from an example prompt.
+- Local dev-only symlink support documented for testing the skill without
+  going through the marketplace install flow (`.claude/` is gitignored, not
+  part of the shipped plugin).
+
 ## 0.2.0 — 2026-07-22
 
 - Renamed model cost tiers from "free/paid/expensive" to "cheap/costly" —

@@ -4,8 +4,9 @@
  * Generate N variations of the same prompt. Defaults to the cheapest model
  * for cheap exploration before committing to a pricier model for the final pick.
  *
- * Example:
+ * Examples:
  *   node batch.js --prompt "a coral-colored octopus mascot logo" --count 4
+ *   node batch.js --prompt "..." --count 3 --aspect-ratio 16:9
  */
 const fs = require("fs");
 const path = require("path");
@@ -43,8 +44,14 @@ async function main() {
   }
 
   const count = args.count ? parseInt(args.count, 10) : 3;
-  const width = args.width ? parseInt(args.width, 10) : 1024;
-  const height = args.height ? parseInt(args.height, 10) : 1024;
+  let width, height;
+  try {
+    ({ width, height } = core.resolveDimensions({ width: args.width, height: args.height, aspectRatio: args["aspect-ratio"] }));
+  } catch (e) {
+    console.error(`Error: ${e.message}`);
+    process.exitCode = 1;
+    return;
+  }
   const allowExpensive = !!args["allow-expensive"];
 
   const outDir = core.defaultOutputDir();
