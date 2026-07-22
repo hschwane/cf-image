@@ -76,8 +76,8 @@ This plugin is meant to be used through its **Claude Code skill**, not by
 running the Node scripts yourself — just ask Claude for an image and it
 handles prompt crafting, model selection, and cost tracking for you:
 
-> "generate a logo for my app called Octofood, a food/recipe/grocery
-> planner, featuring a cute octopus"
+> "generate a logo for my app, a weather widget, featuring a friendly cloud
+> mascot"
 >
 > "give me a few variations of a rocket ship icon"
 >
