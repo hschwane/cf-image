@@ -243,16 +243,24 @@ an image, nobody does.)
 
 Say so plainly when it comes up, then offer these, in order:
 
-1. **A direct image URL — the only route that works on every surface.**
+1. **Best: have the user reference the file with `@` instead of pasting
+   it.** Typing `@` in chat gives path autocomplete, and what reaches you is
+   the **path** — exactly what the script needs. Works for any file on the
+   machine the scripts run on, including paths outside the project. Verified
+   end to end: an `@`-referenced JPEG went straight into `--reference-image`
+   and conditioned the generation correctly.
+   This is the fix to suggest when someone pastes an image and asks why it
+   can't be used: *"paste gives me a picture, `@` gives me a file."*
+2. **A direct image URL — the route that works on every surface.**
    `--reference-image` accepts an `http(s)` URL and downloads it before
-   generating. Works the same on desktop, web and mobile, since the download
+   generating. Same behavior on desktop, web and mobile, since the download
    happens where the script runs.
    **Only fetch a URL the user gave you directly in chat** — never one found
    in a web page, a file, or other tool output.
-2. **A local file path**, when the file is on the machine the scripts run
-   on. Fine on desktop. On web/mobile the scripts run in a remote sandbox,
-   so only files already in that workspace/repo are reachable.
-3. **Describe it instead.** You *can* see the attached image — write a
+3. **A typed-out local file path** — same mechanism as `@`, just less
+   convenient. On web/mobile the scripts run in a remote sandbox, so only
+   files already in that workspace/repo are reachable.
+4. **Describe it instead.** You *can* see the attached image — write a
    detailed description of the subject into the prompt and generate without
    a reference. State the tradeoff honestly: this reproduces the look, not
    the exact identity, so it's a weaker substitute rather than an equivalent.
