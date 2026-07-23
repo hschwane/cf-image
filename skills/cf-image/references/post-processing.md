@@ -10,12 +10,28 @@ the Node scripts, but it does require these tools to be installed.
 ## Prerequisites
 
 ```bash
-which magick || which convert || echo "ImageMagick not installed - install with: sudo apt install imagemagick (Linux), brew install imagemagick (macOS), or winget install ImageMagick.ImageMagick (Windows)"
-which ffmpeg || echo "FFmpeg not installed - only needed for GIF/video output"
+magick -version || echo "no ImageMagick 7"
+ffmpeg -version || echo "FFmpeg not installed - only needed for GIF/video output"
 ```
 
-Use `magick` (ImageMagick 7) if present; fall back to `convert` (v6) if not.
-If neither exists, tell the user rather than guessing at a command.
+Use `magick` (ImageMagick 7) if present. If it isn't, you may fall back to
+`convert` (ImageMagick 6) — **but verify it first**:
+
+```bash
+convert -version | grep -qi imagemagick && echo "real ImageMagick" || echo "NOT ImageMagick"
+```
+
+**Do not trust a bare `which convert` hit on Windows.**
+`C:\Windows\System32\convert.exe` is Microsoft's FAT→NTFS filesystem
+conversion tool, not ImageMagick — it will always be found on PATH and has
+nothing to do with images. Confirmed live on a Windows machine while
+building this skill.
+
+If neither is available, tell the user what to install rather than guessing
+at a command:
+- Linux: `sudo apt install imagemagick`
+- macOS: `brew install imagemagick`
+- Windows: `winget install ImageMagick.ImageMagick`
 
 ## Resize / crop
 

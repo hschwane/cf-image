@@ -146,6 +146,14 @@ can do. What it does on every request:
    model, and the real cost in neurons — with a running total for the
    session, and a budget warning if you're getting close to the daily cap.
 
+**Where images land:** generated images are saved to `.cf-image/output/`
+inside your current working directory — that keeps their paths relative to
+the project, which is what makes them viewable and clickable in the chat.
+The folder gets a self-ignoring `.gitignore` on creation, so generated
+images never show up in your git status. Override with `--out-dir` or the
+`CF_IMAGE_OUTPUT_DIR` environment variable. Saved presets are separate and
+stay global, under `~/.cf-image/presets/`.
+
 Full behavioral details (the exact workflow, budget policy, and known
 model quirks) live in [`skills/cf-image/SKILL.md`](skills/cf-image/SKILL.md)
 and [`skills/cf-image/references/`](skills/cf-image/references/) — worth a

@@ -10,16 +10,70 @@ Turns a plain-language image request into a well-crafted prompt, picks a
 cost-appropriate model, generates it, and reports the real cost and the
 actual image.
 
-## MANDATORY: show every image inline
+## MANDATORY: the user must SEE every image
 
-After **every** generation, immediately display the image **inline in the
-chat** by opening the saved file with the **Read tool** (reading a `.jpg`
-renders it visually). Do this **automatically, every time, without being
-asked** — the user should never have to say "show me the image."
+Every generation must end with the user either **(a) seeing the images
+inline in chat** or **(b) getting a gallery Artifact**. Never answer with
+only a file path — a path shows the user nothing. Do this **automatically,
+every time, without being asked**.
 
-A file path or a link on its own is **not** an acceptable substitute — the
-user cannot see the result from a path. Read failed once already in testing
-by only posting a path; do not repeat that. If you generated it, show it.
+### How to actually display an image inline
+
+These three were tested live in a real session — this is what works, not
+what should work:
+
+1. **Read tool → renders the image inline.** Call `Read` on the saved file
+   (absolute path). A `.jpg`/`.png` renders visibly, at a sensible size.
+   **This is the default — do it for every generated image.**
+2. **Clickable link → use a working-directory-relative path.** Give the file
+   as a markdown link whose href is relative to the working directory:
+   `[20260723-klein4b-red-apple.jpg](.cf-image/output/20260723-klein4b-red-apple.jpg)`.
+   Only working-directory-relative paths are clickable; an absolute
+   `C:\Users\...` path is **not**. That's exactly why images are saved
+   inside the project — see "Where images are saved" below.
+   `generate.js` prints this relative path for you on a line labeled
+   `Saved (relative, use this for the chat link):` — use that value verbatim.
+
+So the normal answer = **Read tool (image) + relative markdown link (file)**.
+
+**Fallback if the user says they can't see the images:** embed them as
+markdown images instead — `![](.cf-image/output/filename.jpg)`. This renders
+in the message body rather than in a tool result, so it survives on surfaces
+where tool results aren't shown. Two caveats, both measured: it renders
+**very large**, and the size **cannot** be controlled — HTML
+`<img src="..." width="400">` is **not** rendered, it appears as raw text.
+So use markdown embedding only when the Read route fails for that user.
+
+### Gallery instead of inline (many images only)
+
+Above **~6 images at once**, don't dump them all inline — build an Artifact
+gallery: a numbered mini-portfolio with image, prompt and settings per
+entry, so the user can compare and pick. Generate the embedded base64 with a
+script, never by typing it out yourself. **Six or fewer: show them inline.**
+
+Either way, the user sees real images — never just a list of paths.
+
+## Where images are saved
+
+Generated images go into **`.cf-image/output/` inside the current working
+directory**, so their paths are working-directory-relative and therefore
+linkable and clickable in chat. The directory is created on demand with a
+self-ignoring `.gitignore`, so generated images never pollute the user's git
+history. Override with `--out-dir` or `CF_IMAGE_OUTPUT_DIR` if needed.
+
+Because of this, **run the scripts from the user's project directory** —
+do **not** `cd` into the skill's own directory first, or the images land
+inside the plugin and stop being linkable. Invoke the script by its path
+instead (the skill's base directory is given at the top of this skill):
+
+```bash
+node "<skill-dir>/scripts/generate.js" --prompt "..."
+```
+
+`generate.js` warns on stderr if the output would land inside the skill dir.
+
+Presets are separate and stay **global** (`~/.cf-image/presets/`) so one
+brand definition is reusable across projects.
 
 ## Read these first
 
@@ -197,8 +251,11 @@ Trigger: the user wants resize, crop, format conversion, or transparency
 no built-in resize, so this shells out to ImageMagick/FFmpeg. Before running
 anything, pre-flight the tool:
 ```bash
-which magick || which convert || echo "ImageMagick not installed"
+magick -version || echo "no ImageMagick 7"
 ```
+Never treat a bare `which convert` hit as proof ImageMagick exists — on
+Windows that finds Microsoft's filesystem tool, not ImageMagick (see
+`references/post-processing.md`).
 Then follow the recipes in `references/post-processing.md` (including the
 green-screen + chroma-key pipeline for real transparent PNGs). If the tool
 isn't installed, tell the user what to install — don't fake success.
@@ -252,23 +309,24 @@ or pre-spend estimate — never a remembered figure.
 
 After every generation:
 
-1. **Show the actual image inline** by reading the output file — this is
-   mandatory and comes first (see the MANDATORY section at the top). Never
-   answer with only a path.
-2. Give the saved **file path as plain `code`** (not as a markdown link —
-   absolute paths outside the project don't render as clickable links, so a
-   fake link is just noise). State the **actual prompt sent**, the
-   **model**, and the **resolution/settings** used.
+1. **Show the actual image inline** by calling Read on the output file —
+   mandatory, and it comes first (see the MANDATORY section at the top).
+   Never answer with only a path.
+2. Give the file as a **clickable markdown link with the
+   working-directory-relative path** (the `Saved (relative, ...)` line from
+   `generate.js`), e.g.
+   `[20260723-klein4b-red-apple.jpg](.cf-image/output/20260723-klein4b-red-apple.jpg)`.
+   State the **actual prompt sent**, the **model**, and the
+   **resolution/settings** used.
 3. State the **real cost** in neurons (+ USD equivalent) for this
    generation, and the **running total for this session** so far.
 4. Periodically — every few generations, and always before a costly-tier
    spend — re-check real daily usage with `cost.js` (not just the session
    running total, since usage can exist outside this conversation) and warn
    the user if getting close to the cap.
-5. For more than ~4 images at once, don't dump every one inline — build an
-   Artifact presenting all of them as a numbered mini-portfolio (image,
-   prompt, settings per entry) so the user can compare and pick. Four or
-   fewer: show them inline.
+5. Six or fewer images: show them all inline. **More than ~6 at once:**
+   build the Artifact gallery instead (see "Gallery instead of inline").
+   One of the two always happens — never just a list of paths.
 6. If relevant, offer 1-2 concrete refinement ideas (a different angle, a
    model worth trying for a specific weakness, a pose/lighting tweak) —
    don't pad this if the result already looks like a solid match.
@@ -312,6 +370,12 @@ node scripts/cost.js
 node scripts/cost.js estimate --model dev --count 3
 ```
 
-All generated images save under `~/.cf-image/output/` (override with
-`CF_IMAGE_HOME`), named with a timestamp, model key, and a short slug of the
-prompt. Presets live under `~/.cf-image/presets/`.
+**Invocation:** the commands above write `scripts/...` for brevity, but
+always run them **from the user's project directory** with the skill's full
+path — `node "<skill-dir>/scripts/generate.js" ...` — never by `cd`-ing into
+the skill directory (see "Where images are saved").
+
+Generated images save under `.cf-image/output/` **in the working directory**
+(override with `--out-dir` or `CF_IMAGE_OUTPUT_DIR`), named with a
+timestamp, model key, and a short slug of the prompt. Presets stay global
+under `~/.cf-image/presets/` (override with `CF_IMAGE_HOME`).

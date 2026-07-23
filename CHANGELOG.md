@@ -3,6 +3,48 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.6.0 — 2026-07-24
+
+Fixes the "I generated it but you never saw it" problem, reported from a
+real session where images were only ever posted as paths.
+
+**Images now save into the working directory**
+- Output moved from `~/.cf-image/output/` to `.cf-image/output/` **inside
+  the current working directory**. Chat clients only render and link paths
+  that are relative to the working directory, so an image saved outside it
+  can never be shown or clicked — this was the root cause. No manual env var
+  needed. Override with the new `--out-dir` flag or `CF_IMAGE_OUTPUT_DIR`.
+- Presets deliberately stay **global** (`~/.cf-image/presets/`) — one brand
+  definition should be reusable across projects.
+- The output dir is created with a **self-ignoring `.gitignore`**, so
+  generated images never pollute the user's git history.
+- `generate.js` now prints the working-directory-relative path on its own
+  labeled line, so the link in chat can be built from it verbatim.
+- Added a guard: `generate.js` warns if the resolved output directory is
+  inside the skill's own folder — the failure mode you get by `cd`-ing into
+  the skill directory before running it. SKILL.md now documents invoking the
+  script by full path from the project directory instead.
+
+**Display instructions are now based on live testing, not assumption**
+Tested all candidate methods in a real session and wrote the results into
+SKILL.md:
+- Read tool on the saved file → renders inline at a sensible size. **Default.**
+- Markdown link with a working-dir-relative path → clickable. **Always include.**
+- Markdown image embed `![](path)` → renders, but **very large** with no way
+  to size it. Documented as the fallback when tool results aren't visible.
+- HTML `<img width=...>` → **not rendered at all**, appears as raw text.
+  Previously a plausible-looking option; now explicitly ruled out.
+- Gallery Artifact threshold raised from >4 to **>6 images** — the user
+  asked for inline by default and the gallery only for genuinely large
+  batches. Either way, one of the two must always happen.
+
+**Also fixed**
+- The post-processing pre-flight check was wrong on Windows: `which convert`
+  always succeeds there because `C:\Windows\System32\convert.exe` is
+  Microsoft's FAT→NTFS filesystem tool, not ImageMagick. Both SKILL.md and
+  `references/post-processing.md` now check `magick` first and require
+  verifying `convert -version` actually reports ImageMagick.
+
 ## 0.5.0 — 2026-07-23
 
 Skill-usability pass driven by a live test session (gray cat vs. quail).

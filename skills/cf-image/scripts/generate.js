@@ -64,10 +64,12 @@ async function main() {
 
   let outFile = args["out-file"];
   if (!outFile) {
+    const outDir = args["out-dir"] || core.defaultOutputDir();
+    core.warnIfOutputInsideSkill(outDir);
     const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
     // Keep the prompt slug short - long filenames are unwieldy in the chat
     // and the timestamp already guarantees uniqueness.
-    outFile = core.uniqueOutFile(path.join(core.defaultOutputDir(), `${stamp}-${model}-${core.slugify(args.prompt, 20)}.jpg`));
+    outFile = core.uniqueOutFile(path.join(outDir, `${stamp}-${model}-${core.slugify(args.prompt, 20)}.jpg`));
   }
 
   try {
@@ -81,6 +83,13 @@ async function main() {
       referenceImagePaths,
     });
 
+    // The working-directory-relative path is what makes a clickable markdown
+    // link in chat - print it first and explicitly so it gets used.
+    const relPath = path.relative(process.cwd(), result.outFile).split(path.sep).join("/");
+    const insideCwd = !relPath.startsWith("..") && !path.isAbsolute(relPath);
+    if (insideCwd) {
+      console.log(`Saved (relative, use this for the chat link): ${relPath}`);
+    }
     console.log(`Saved: ${result.outFile}`);
     console.log(`Model: ${result.modelId} (tier: ${result.tier})`);
     if (result.neurons !== null) {
