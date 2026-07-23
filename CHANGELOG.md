@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.7.0 — 2026-07-24
+
+Reference images can now come straight from the chat.
+
+- **New `scripts/clipboard.js`**: saves the image currently on the system
+  clipboard to `.cf-image/input/` and prints its path, ready to hand to
+  `generate.js --reference-image`. An image pasted or attached in chat is
+  visible to Claude but has no path on disk, which is why it previously had
+  to be saved manually first — if the user pasted it, the same image is
+  still on their clipboard, so this picks it up from there.
+  Windows (PowerShell/System.Windows.Forms) is **tested end to end**,
+  including the full clipboard → reference → generation chain. The macOS
+  (`osascript`) and Linux (`wl-paste`/`xclip`) paths are implemented but
+  untested. Zero dependencies, as everywhere else in this toolkit.
+- SKILL.md gained a "Reference image pasted or attached in chat" workflow
+  with an explicit fallback ladder: grab from clipboard → ask the user to
+  copy it or give a path → last resort, describe the image (Claude can see
+  it) and generate without a reference, saying plainly that this preserves
+  the look but not the exact identity.
+- Investigated and ruled out reading chat attachments from disk — the
+  desktop app doesn't cache them anywhere findable (checked).
+
 ## 0.6.0 — 2026-07-24
 
 Fixes the "I generated it but you never saw it" problem, reported from a

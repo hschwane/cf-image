@@ -109,7 +109,7 @@ upfront:
 |---|---|---|
 | **Interactive** | Any plain-language image request, no exact syntax needed; also any follow-up tweak to the last image ("make it warmer", "now try it at night") | Infers intent, crafts a prompt, picks a model, generates, shows + reports. Follow-ups just continue in conversation, reusing the last image as a reference when it's an edit |
 | **Generate** | "generate/create/make a..." | One fresh image, cheapest tier by default |
-| **Edit** | "edit this image `<path>`...", "change X in this image to..." | Conditions on the existing image, prompts only the delta |
+| **Edit** | "edit this image `<path>`...", "change X in this image to...", or an image **pasted/attached in chat** | Conditions on the existing image, prompts only the delta. A pasted image has no path — grab it off the clipboard first (see "Reference image pasted or attached in chat") |
 | **Batch** | "give me N variations", "show me some options" | N distinctly varied prompts, one generation each — not the same prompt N times |
 | **Post-process** | "crop/resize this", "make the background transparent", "convert to png" | Shells out to ImageMagick/FFmpeg per `references/post-processing.md` |
 | **Setup** | New session's validation fails, or "set up cf-image" | Walks `references/setup.md` |
@@ -224,6 +224,31 @@ with `--reference-image` (up to 4) and a prompt describing **only the
 delta**, not the whole scene — see `references/prompting.md`'s "Editing via
 reference images" for how explicit and spatial the instruction must be. The
 same mechanism handles "give me variations of this existing image."
+
+### Reference image pasted or attached in chat
+
+An image the user pastes or attaches in chat is **visible to you but has no
+path on disk**, so it can't be handed to `generate.js --reference-image`
+directly. **Do not just tell the user to go save the file somewhere** — work
+through these in order:
+
+1. **If they pasted it (Ctrl+V), it's still on their clipboard.** Grab it:
+   ```bash
+   node "<skill-dir>/scripts/clipboard.js"
+   ```
+   It writes the clipboard image to `.cf-image/input/` and prints the path —
+   pass that straight to `--reference-image`. Tested working on Windows; the
+   macOS (`osascript`) and Linux (`wl-paste`/`xclip`) paths are implemented
+   but untested, so report back if they fail.
+2. **If the clipboard has no image** (e.g. they used the file-picker attach
+   button, which doesn't populate the clipboard), the script says so
+   clearly. Ask the user to either copy the image (Ctrl+C, or right-click →
+   "Copy image") and retry step 1, or give you the file path.
+3. **Last resort — describe it instead.** You *can* see the attached image
+   even without a path, so write a detailed description of the subject into
+   the prompt and generate without a reference. Tell the user plainly that
+   this is weaker than real reference conditioning: it captures the look,
+   not the exact identity.
 
 ### Refining across turns
 
@@ -357,6 +382,10 @@ node scripts/generate.js --prompt "..." --preset acme
 # Edit / condition on up to 4 existing images (also used for refinement)
 node scripts/generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
 
+# Save the image on the clipboard to a file, for use as --reference-image
+# (this is how an image the user PASTED into chat gets a usable path)
+node scripts/clipboard.js
+
 # Manage presets
 node scripts/presets.js list
 node scripts/presets.js show acme
@@ -377,5 +406,7 @@ the skill directory (see "Where images are saved").
 
 Generated images save under `.cf-image/output/` **in the working directory**
 (override with `--out-dir` or `CF_IMAGE_OUTPUT_DIR`), named with a
-timestamp, model key, and a short slug of the prompt. Presets stay global
-under `~/.cf-image/presets/` (override with `CF_IMAGE_HOME`).
+timestamp, model key, and a short slug of the prompt. Clipboard-grabbed
+reference images land in `.cf-image/input/` (override with
+`CF_IMAGE_INPUT_DIR`). Presets stay global under `~/.cf-image/presets/`
+(override with `CF_IMAGE_HOME`).

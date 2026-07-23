@@ -42,6 +42,7 @@ about it.
 |---|---|
 | Generate one image | "generate a logo for my app, featuring..." |
 | Edit an existing image | "using this image at `<path>`, change the background to a beach" |
+| Use an image you pasted into chat as reference | paste the image (Ctrl+V), then "use this as reference and put it on a beach" — it's pulled off your clipboard automatically |
 | Keep refining a result across turns | "make the cat look less cartoony" — right after a previous generation, no special syntax needed |
 | Get several options to pick from | "give me 4 variations of a rocket ship icon" |
 | Control framing | "...in 16:9" / "a square icon" / "portrait/mobile format" |
@@ -185,6 +186,7 @@ strengths/weaknesses per model, and prompting guidance live in
 | `generate.js` | Generate one image (supports `--aspect-ratio`, `--preset`, `--reference-image` up to 4x) |
 | `cost.js` | `today` (default): usage + remaining budget, warns at 60% used. `estimate --model <key> --count <n>`: cost of a planned generation, no API call |
 | `presets.js` | Manage saved brand/style presets (`list`/`show`/`create`/`delete`) |
+| `clipboard.js` | Save the image on the clipboard to a file, so an image pasted into chat can be used as a reference |
 
 There's no batch script — the skill generates variations by calling
 `generate.js` several times with genuinely different prompts (identical
