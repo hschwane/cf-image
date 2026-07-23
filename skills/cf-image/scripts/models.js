@@ -12,10 +12,10 @@ function main() {
   for (const key of keys) {
     const e = core.MODEL_CATALOG[key];
     const usd = ((e.neuronsPer1024 / 1000) * core.OVERAGE_RATE_PER_1000).toFixed(4);
-    const refImg = e.referenceImages ? "yes*" : "no";
+    const refImg = e.referenceImages === "confirmed" ? "yes" : e.referenceImages === "experimental" ? "yes*" : "no";
     console.log(`${key.padEnd(9)}${e.tier.padEnd(9)}${String(e.neuronsPer1024).padEnd(13)}${usd.padEnd(10)}${refImg.padEnd(8)}${e.id}`);
   }
-  console.log("* = experimental/untested, see references/models.md");
+  console.log("* = experimental/unconfirmed for this model (works on klein4b by direct test), see references/models.md");
 
   console.log("");
   for (const key of keys) {

@@ -59,7 +59,8 @@ shared budget faster.
    - Default: `klein4b` (currently billing 0 neurons — the literal cheapest
      option, **but see the caveat below**, this may not stay true). If it
      safety-filters a prompt (error 3030) or its output looks wrong for the
-     ask, fall back to `schnell` (also cheap-tier, ~19 neurons) rather than
+     ask, fall back to `schnell` (also cheap-tier, ~173 neurons — still
+     trivial, but not as negligible as it was once documented) rather than
      jumping straight to a costly model.
    - **Caveat on `klein4b`'s 0 cost**: this is suspected to be a pricing bug
      or promotional launch rate, not an intentional permanent free model —
@@ -207,19 +208,26 @@ filename — not inside the plugin's own installed directory, so it behaves
 correctly whether this was cloned locally or installed via a marketplace.
 Presets live under `~/.cf-image/presets/`.
 
-## Experimental (implemented but untested against the live API)
+## Reference-image conditioning (confirmed on klein4b, experimental elsewhere)
 
-- **Reference-image conditioning** (`--reference-image`, repeatable up to 4
-  times, maps to Cloudflare's documented `input_image_0`..`input_image_3`
-  multipart fields). Only `klein4b`, `klein9b`, and `dev` accept it
-  (multipart-format models); `phoenix`/`lucid`/`schnell` reject it
-  client-side before any API call. This is how both "give me variations of
-  this existing image" and "edit this image" style requests should be
-  attempted once verified — there's no separate edit endpoint. **Tell the
-  user explicitly this hasn't been confirmed working yet** when you use it,
-  and report back exactly what happened (success, malformed response,
-  rejected fields, etc.) so `references/models.md` can be updated with real
-  findings.
+`--reference-image` (repeatable up to 4 times) maps to Cloudflare's
+documented `input_image_0`..`input_image_3` multipart fields. Only
+`klein4b`, `klein9b`, and `dev` accept it (multipart-format models);
+`phoenix`/`lucid`/`schnell` reject it client-side before any API call. This
+is how both "give me variations of this existing image" and "edit this
+image" style requests work — there's no separate edit endpoint.
+
+**Confirmed working on `klein4b`** (tested 2026-07-23): it faithfully
+preserves the reference image's subject/style while applying the requested
+change (verified with an illustration composited onto a new background per
+instructions) — genuine editing, not just inspiration. **Not free**: unlike
+plain `klein4b` generation, a reference-image call bills ~5.37 neurons per
+input image (matches Cloudflare's documented input-tile rate) — mention
+this if the user assumes klein4b is always free.
+
+`klein9b`/`dev` support is still **unconfirmed** (assumed by family
+similarity only) — tell the user explicitly if you use it on those two, and
+report back what happens so `references/models.md` can be updated.
 
 ## Not implemented (by design, not oversight)
 

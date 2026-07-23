@@ -172,21 +172,20 @@ documented in [`SKILL.md`](skills/cf-image/SKILL.md).
 
 ## Known limitations
 
-- The daily free-tier cap was hit during development, so a full
-  generate-and-save round trip hasn't been re-verified end-to-end after a
-  quota reset yet — everything up to that point (both request formats,
-  budget-gate blocking, error handling, the specific "daily allocation
-  exhausted" error) has been live-tested against the real API and works.
-  Re-testing is planned once quota allows.
-- **Reference-image conditioning** (`--reference-image`, for
-  `klein4b`/`klein9b`/`dev`) is implemented but has never been exercised
-  against the live API — treat it as experimental until confirmed. See
-  `skills/cf-image/references/models.md`.
+- **Reference-image conditioning** (`--reference-image`) is confirmed
+  working on `klein4b` (genuine image editing/compositing, not just
+  inspiration — see `skills/cf-image/references/models.md`), but note it's
+  **not free**: unlike plain `klein4b` generation it bills per input tile.
+  `klein9b`/`dev` support is still unconfirmed (assumed by family
+  similarity only).
 - `google/nano-banana-2-lite` (Google, via AI Gateway) is documented but not
   wired up — it's a separate billing system (gateway balance/BYOK) outside
   Workers AI neurons.
 - No multi-turn "chat" sessions or a bundled prompt-idea database — see
   `SKILL.md`'s "Not implemented" section for why.
+- Aspect ratios other than the 1024x1024 square default are implemented
+  (`--aspect-ratio`) but not yet exercised against the live API — treat
+  non-square output as unverified until confirmed.
 
 ## License
 

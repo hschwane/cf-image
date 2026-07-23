@@ -61,7 +61,7 @@ async function main() {
 
   let outFile = args["out-file"];
   if (!outFile) {
-    const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
+    const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
     outFile = path.join(core.defaultOutputDir(), `${stamp}-${model}-${core.slugify(args.prompt)}.jpg`);
   }
 

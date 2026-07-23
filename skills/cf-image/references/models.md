@@ -35,7 +35,7 @@ Don't describe any of these models as "not free-tier" — that's not accurate.
 
 | Key | Model ID | Tier | Neurons / 1024px image (measured) | Request format | Response format |
 |---|---|---|---|---|---|
-| `schnell` | `@cf/black-forest-labs/flux-1-schnell` | cheap | 19.2 | JSON body | JSON, base64 `result.image` |
+| `schnell` | `@cf/black-forest-labs/flux-1-schnell` | cheap | 172.8 | JSON body | JSON, base64 `result.image` |
 | `klein4b` | `@cf/black-forest-labs/flux-2-klein-4b` | cheap | **0** (see caveat below) | multipart/form-data | JSON, base64 |
 | `klein9b` | `@cf/black-forest-labs/flux-2-klein-9b` | costly | 1,363.64 | multipart/form-data | JSON, base64 |
 | `phoenix` | `@cf/leonardo/phoenix-1.0` | costly | 3,120 | JSON body | **raw binary** (`Content-Type: image/jpeg`), no JSON wrapper |
@@ -43,7 +43,7 @@ Don't describe any of these models as "not free-tier" — that's not accurate.
 | `dev` | `@cf/black-forest-labs/flux-2-dev` | costly | 7,500 | multipart/form-data | JSON, base64 |
 
 USD equivalents (Workers Paid plan overage rate, $0.011/1,000 neurons):
-schnell ≈ $0.0002, klein9b ≈ $0.0150, phoenix ≈ $0.0343, lucid ≈ $0.0430,
+schnell ≈ $0.0019, klein9b ≈ $0.0150, phoenix ≈ $0.0343, lucid ≈ $0.0430,
 dev ≈ $0.0825 per image. `dev` is disproportionately pricier than the other
 three "costly" models — ~75% of the entire daily free allocation per image.
 
@@ -70,7 +70,14 @@ Practical implications:
 ## Per-model quirks discovered by testing
 
 - **`schnell`**: plain JSON POST, no surprises. Good fallback when
-  `klein4b`'s safety filter blocks a prompt.
+  `klein4b`'s safety filter blocks a prompt. **Pricing corrected
+  2026-07-23**: a clean single-call header reading on a fresh day measured
+  **172.8 neurons**, not the 19.2 this doc listed before — that number was
+  calculated from Cloudflare's published per-tile rate (4.8/tile × 4 tiles)
+  rather than directly measured, the same mistake already caught for
+  `lucid-origin` (see below) but missed for `schnell` until now. Still far
+  cheaper than any costly-tier model, just not as negligible as previously
+  documented.
 - **`klein4b`**: a JSON body request returns HTTP 400
   `"required properties at '/' are 'multipart'"` — it *only* accepts
   multipart/form-data (fields: `prompt`, `width`, `height`, and optionally
@@ -99,24 +106,29 @@ Practical implications:
   count (if exposed) would change the price. By far the most expensive
   model tested — almost 6x `lucid-origin` and ~390x `schnell`.
 
-## Reference images (experimental, implemented but untested)
+## Reference images (`klein4b` confirmed working; `klein9b`/`dev` still experimental)
 
 `scripts/core.js` / `scripts/generate.js` support attaching up to 4
 reference images (`--reference-image`, repeatable), sent as multipart fields
 `input_image_0`..`input_image_3`. This is how Cloudflare's changelog
-documents multi-reference conditioning for `klein4b` (and, by family
-similarity, presumably `klein9b`/`dev` — untested); the same mechanism is
-also how "edit this image" style requests should work, since these are
-unified generation/editing models with no separate edit endpoint.
+documents multi-reference conditioning for `klein4b`; the same mechanism is
+also how "edit this image" style requests work, since these are unified
+generation/editing models with no separate edit endpoint.
 
-**Status: implemented, never actually exercised against the live API.** The
-client-side request construction (reading file bytes, attaching as a `Blob`
-with a guessed MIME type, gating to only multipart-format models) has been
-verified to build correctly and reach the network, but the daily quota was
-exhausted before a real end-to-end test could confirm the server accepts
-this shape or what it returns. Whoever runs this next: try it, and update
-this section with what actually happened (works as expected / different
-field names needed / different response shape / etc).
+**Status: confirmed working on `klein4b`, tested 2026-07-23.** Gave it an
+existing flat-illustration image (a succulent in a striped pot) plus the
+prompt "the same succulent plant and pot, but now on a wooden desk next to a
+laptop." Result: it faithfully preserved the exact illustration (same pot
+stripes, same plant shape/style) and composited it onto a new photorealistic
+desk scene as asked — genuine image editing/compositing, not just "inspired
+by." **Cost: 5.37 neurons** for one input image, matching Cloudflare's
+documented `klein4b` input-tile rate exactly — note this means a
+reference-image call is NOT covered by `klein4b`'s usual 0-neuron plain-
+generation cost, it bills for the input tile(s).
+
+`klein9b` and `dev` are assumed to support the same `input_image_0..3`
+shape by family similarity (same request format, same changelog family) but
+this has **not** been tested — verify before relying on it for those two.
 
 ## Researched characteristics (strengths / weaknesses / use cases)
 

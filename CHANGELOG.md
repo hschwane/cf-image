@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.3.1 — 2026-07-23
+
+First live end-to-end test run of the plugin (via the actual skill, loaded
+through a local directory junction) after the daily quota reset. All cheap-
+tier, total spend ~178 neurons.
+
+- **Fixed `schnell`'s documented pricing**: measured 172.8 neurons on a
+  clean single-call header reading (fresh day, first call), not the 19.2
+  this doc/catalog previously listed — that figure was calculated from
+  Cloudflare's published per-tile rate rather than directly measured, same
+  category of error already caught for `lucid-origin`. Still cheap-tier,
+  just not as negligible as previously documented.
+- **Confirmed reference-image conditioning works on `klein4b`**: gave it an
+  existing image plus an edit instruction, got back a faithful edit (same
+  subject/style, new requested background) — genuine compositing, not just
+  inspiration. Costs ~5.37 neurons per input image (matches Cloudflare's
+  documented input-tile rate) - NOT covered by klein4b's usual 0-neuron
+  plain-generation cost. `klein9b`/`dev` remain unconfirmed.
+- Confirmed the full generate → save → report round trip works end-to-end
+  through the actual scripts (previously only verified up to the request/
+  error-handling layer, blocked by an exhausted quota).
+- Fixed a cosmetic bug: output filenames had a stray trailing `.` from an
+  off-by-one in the timestamp slice.
+
 ## 0.3.0 — 2026-07-23
 
 - Added `cost.js estimate --model <key> --count <n>`: quotes a generation's

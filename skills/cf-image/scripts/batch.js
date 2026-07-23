@@ -57,7 +57,7 @@ async function main() {
   const outDir = core.defaultOutputDir();
   fs.mkdirSync(outDir, { recursive: true });
   const slug = core.slugify(args.prompt, 30);
-  const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
+  const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
 
   const results = [];
   for (let i = 1; i <= count; i++) {

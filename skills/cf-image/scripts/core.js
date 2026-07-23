@@ -39,18 +39,22 @@ const BUDGET_WARNING_FRACTION = 0.6; // warn once daily usage crosses 60% of the
 // and third-party comparisons (see references/models.md "Researched
 // characteristics" section for sources) - reputational, not measured by us.
 //
-// referenceImages: 'experimental' means Cloudflare's changelog documents
-// input_image_0..input_image_3 multipart fields for this model, but it has
-// NOT been exercised against the live API by us yet - treat as untested.
+// referenceImages: 'confirmed' means multi-reference conditioning
+// (input_image_0..input_image_3 multipart fields) has been exercised
+// against the live API and works. 'experimental' means Cloudflare's
+// changelog documents the same field naming for this model, by family
+// similarity to klein4b, but it hasn't been tested here yet - treat as
+// unconfirmed. false means no documented support at all.
 const MODEL_CATALOG = {
   schnell: {
     id: "@cf/black-forest-labs/flux-1-schnell",
     tier: "cheap",
     requestFormat: "json",
     responseFormat: "json_base64",
-    neuronsPer1024: 19.2,
+    neuronsPer1024: 172.8,
     referenceImages: false,
-    notes: "Fastest, 4-step distilled Flux. Good fallback for drafts when klein4b's safety filter blocks a prompt.",
+    notes:
+      "Fastest, 4-step distilled Flux. Good fallback for drafts when klein4b's safety filter blocks a prompt. Cost corrected 2026-07-23: a clean single-call header reading on a fresh day measured 172.8 neurons, not the 19.2 previously listed here (that figure was calculated from Cloudflare's published per-tile rate, not directly measured - same mistake we'd already caught for lucid-origin, just hadn't happened to catch for schnell until now). Still far cheaper than any costly-tier model.",
     bestFor: ["rapid drafts", "exploring composition/ideas", "high-volume low-stakes images", "thumbnails"],
     weakerFor: ["legible in-image text", "fine detail/complex hands", "photorealism at close range"],
   },
@@ -60,9 +64,9 @@ const MODEL_CATALOG = {
     requestFormat: "multipart",
     responseFormat: "json_base64",
     neuronsPer1024: 0,
-    referenceImages: "experimental",
+    referenceImages: "confirmed",
     notes:
-      "Measured 0 neurons billed across every call so far (confirmed via header + GraphQL analytics), but this is SUSPECTED to be a pricing bug or promotional launch rate, not an intentionally permanent free model - a newer/better model than schnell being priced below it doesn't make architectural sense. Treat the 0 cost as fragile: re-check cost.js after using it, and if it ever reports nonzero neurons, move it out of the default slot (schnell is the natural fallback). Requires multipart/form-data. Safety filter can false-positive on innocuous prompts (error code 3030) - reword if blocked, or fall back to schnell.",
+      "Measured 0 neurons billed for plain text-to-image across every call so far (confirmed via header + GraphQL analytics), but this is SUSPECTED to be a pricing bug or promotional launch rate, not an intentionally permanent free model - a newer/better model than schnell being priced below it doesn't make architectural sense. Treat the 0 cost as fragile: re-check cost.js after using it, and if it ever reports nonzero neurons, move it out of the default slot (schnell is the natural fallback). Requires multipart/form-data. Safety filter can false-positive on innocuous prompts (error code 3030) - reword if blocked, or fall back to schnell. Reference-image conditioning CONFIRMED WORKING 2026-07-23 (see referenceImages) and is NOT free - billed 5.37 neurons for one input image, matching Cloudflare's documented input-tile rate exactly.",
     bestFor: ["rapid drafts", "interactive/real-time iteration", "sub-second turnaround"],
     weakerFor: ["legible in-image text (worse than klein9b)", "fine texture detail"],
   },
