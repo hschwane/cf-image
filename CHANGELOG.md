@@ -3,6 +3,38 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.8.0 — 2026-07-24
+
+Replaces 0.7.0's clipboard approach, which was wrong on three counts: it
+touched the user's clipboard (which can hold passwords and is none of this
+tool's business), it only worked on the local desktop, and it didn't even
+cover the file-picker case, since attaching a file doesn't populate the
+clipboard.
+
+- **Removed `scripts/clipboard.js`.** The user's clipboard is off limits;
+  SKILL.md now says so explicitly so the idea doesn't get reinvented.
+- **Established the actual constraint.** Checked the Claude Code docs: image
+  attachments are handed to the model as visual content and are **never**
+  written to the filesystem — on any surface (CLI, desktop, web, mobile).
+  There is no path, no cached copy, no API for their bytes. So "paste an
+  image and use it as a reference" is not achievable, and the skill now
+  states that plainly instead of implying a workaround exists.
+- **`--reference-image` now accepts an `http(s)` URL**, downloading it to
+  `.cf-image/input/` before generating. This is the one reference route that
+  behaves identically on desktop, web and mobile, because the download
+  happens wherever the script runs. Verified end to end, including a
+  non-image URL being rejected with a clear message, and a missing local
+  file producing a readable error instead of a raw ENOENT. Sends an explicit
+  User-Agent — several hosts (Wikimedia among them) answer HTTP 400 without
+  one.
+- Documented the fallback ladder in SKILL.md and the README: direct URL →
+  local file path → describe the attached image and generate without a
+  reference, stating honestly that the last one preserves the look but not
+  the exact identity.
+- Security note in both the code and the skill: only ever fetch a URL the
+  user supplied directly in chat, never one discovered in a web page, file,
+  or other tool output.
+
 ## 0.7.0 — 2026-07-24
 
 Reference images can now come straight from the chat.

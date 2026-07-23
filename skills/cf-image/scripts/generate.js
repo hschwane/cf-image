@@ -60,7 +60,16 @@ async function main() {
     return;
   }
 
-  const referenceImagePaths = args["reference-image"] || [];
+  // --reference-image accepts local paths and http(s) URLs; URLs get
+  // downloaded to .cf-image/input/ first so the API call has real bytes.
+  let referenceImagePaths;
+  try {
+    referenceImagePaths = await core.resolveReferenceImages(args["reference-image"] || [], core.defaultInputDir());
+  } catch (e) {
+    console.error(`Error: ${e.message}`);
+    process.exitCode = 1;
+    return;
+  }
 
   let outFile = args["out-file"];
   if (!outFile) {
