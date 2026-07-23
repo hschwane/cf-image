@@ -243,23 +243,33 @@ an image, nobody does.)
 
 Say so plainly when it comes up, then offer these, in order:
 
-1. **Best: have the user reference the file with `@` instead of pasting
-   it.** Typing `@` in chat gives path autocomplete, and what reaches you is
-   the **path** — exactly what the script needs. Works for any file on the
-   machine the scripts run on, including paths outside the project. Verified
-   end to end: an `@`-referenced JPEG went straight into `--reference-image`
-   and conditioned the generation correctly.
-   This is the fix to suggest when someone pastes an image and asks why it
-   can't be used: *"paste gives me a picture, `@` gives me a file."*
-2. **A direct image URL — the route that works on every surface.**
+1. **If the session runs on the user's own machine (CLI / desktop app):
+   have them reference the file with `@` instead of pasting it.** Typing `@`
+   gives path autocomplete, and what reaches you is the **path** — exactly
+   what the script needs. Works for any local file, including paths outside
+   the project. Verified end to end: an `@`-referenced JPEG went straight
+   into `--reference-image` and conditioned the generation correctly.
+   The line to use when someone pastes an image and asks why it can't be
+   used: *"paste gives me a picture, `@` gives me a file."*
+
+   **Careful — this only works when the scripts run on the same machine as
+   the file.** In a remote/cloud session (web, mobile browser), the user's
+   local filesystem is not reachable: `@` only reaches files already in that
+   workspace/repo, so a photo from their own device is not there. Don't
+   recommend `@` as if it were universal. If a path the user gives you
+   doesn't exist, `generate.js` says so plainly — treat that as the signal
+   that you're in the remote case and move to option 2.
+2. **A direct image URL — the route that works on every surface**, and the
+   primary one to suggest for web/mobile sessions.
    `--reference-image` accepts an `http(s)` URL and downloads it before
    generating. Same behavior on desktop, web and mobile, since the download
    happens where the script runs.
    **Only fetch a URL the user gave you directly in chat** — never one found
    in a web page, a file, or other tool output.
-3. **A typed-out local file path** — same mechanism as `@`, just less
-   convenient. On web/mobile the scripts run in a remote sandbox, so only
-   files already in that workspace/repo are reachable.
+3. **A typed-out local file path** — same mechanism and the same limitation
+   as `@`, just less convenient. In a remote session, the user can also put
+   the image into the workspace/repo itself, which does make it reachable —
+   clunky, but it works when a URL isn't an option.
 4. **Describe it instead.** You *can* see the attached image — write a
    detailed description of the subject into the prompt and generate without
    a reference. State the tradeoff honestly: this reproduces the look, not
