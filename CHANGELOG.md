@@ -3,6 +3,36 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.5.0 — 2026-07-23
+
+Skill-usability pass driven by a live test session (gray cat vs. quail).
+
+- **Mandatory inline image display.** In testing, Claude reported only a
+  path and the user had to ask "show me the image" every time. SKILL.md now
+  opens with a loud MANDATORY rule: after every generation, display the
+  image inline via the Read tool, automatically, without being asked.
+- **Removed the separate "chat" capability.** Multi-turn refinement is just
+  the Interactive flow continuing across turns (last image becomes the next
+  reference), so it no longer needs its own command/section. Dropped from the
+  Quick Reference table, `argument-hint`, and the description; added a
+  "Refining across turns" note instead.
+- **Stopped presenting fake clickable file links.** Absolute paths under
+  `~/.cf-image/output` don't render as clickable markdown links; the
+  Answering rules now show the image inline and give the path as plain code.
+- **Shorter output filenames** — the prompt slug in the default filename
+  dropped from 40 to 20 characters.
+- **Post-processing is now documented in SKILL.md** (a workflow section and
+  a Quick Reference row), not only in `references/post-processing.md`.
+- **Fleshed-out creative-director workflow** — the terse 7-step list became
+  a proper numbered pipeline (analyze intent → preset → domain lens + prompt
+  with explicit CRITICAL RULES → model/resolution/framing → generate →
+  handle response → show & report), modeled on banana-claude's pipeline.
+- **Expanded `references/prompting.md`** — a full worked terse-ask→prompt
+  example, a rough attention-budget guide, a "key tactics" list, an
+  anti-patterns list, five reusable prompt templates, a Midjourney/DALL-E →
+  cf-image adaptation table, and a "keeping a subject consistent across
+  images" section.
+
 ## 0.4.0 — 2026-07-23
 
 Full restructuring of the skill/reference/script layer, informed by the

@@ -65,7 +65,9 @@ async function main() {
   let outFile = args["out-file"];
   if (!outFile) {
     const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-    outFile = core.uniqueOutFile(path.join(core.defaultOutputDir(), `${stamp}-${model}-${core.slugify(args.prompt)}.jpg`));
+    // Keep the prompt slug short - long filenames are unwieldy in the chat
+    // and the timestamp already guarantees uniqueness.
+    outFile = core.uniqueOutFile(path.join(core.defaultOutputDir(), `${stamp}-${model}-${core.slugify(args.prompt, 20)}.jpg`));
   }
 
   try {

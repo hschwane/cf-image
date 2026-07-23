@@ -21,6 +21,27 @@ expand it first, unless the user clearly wants that literal phrase rendered.
 Locking Style explicitly matters most for consistency across a batch or
 across models — without it, results drift call to call.
 
+**Write natural sentences, not tag lists.** These models want prose, not
+`orange cat, dojo, cinematic, 4k`. Weave the components into flowing
+description.
+
+**Worked example** — terse ask → full prompt:
+- Ask: *"a cat training kung fu"*
+- Prompt: *"An orange tabby cat with a white chest patch wearing a small
+  white karate gi, standing upright in a low fighting stance with one paw
+  raised, in a sunlit traditional wooden dojo with paper screens behind it,
+  medium three-quarter shot at eye level, warm afternoon light, cartoon
+  illustration style with clean linework."*
+- Why it works: names the subject concretely, gives a specific pose instead
+  of a vague activity, sets the scene, fixes the framing, and locks the art
+  style so a batch stays consistent.
+
+**Rough attention budget** — where the words matter most. Not a hard rule,
+but a useful sense of proportion when a prompt is getting long: Subject
+~30%, Style ~25%, Setting/Context ~15%, and Action / Composition / Lighting
+~10% each. If you're out of room, cut Setting detail before cutting Subject
+or Style.
+
 ## Domain lenses
 
 Pick one to steer vocabulary; combine with the 5-component formula above.
@@ -97,6 +118,103 @@ exact pose.
 | Photoreal/cinematic | 50-100 words | Camera/lens/lighting details earn their keep here |
 | Reference-image edit | short, delta-only | Describe the change, not the whole scene — see below |
 
+## Key tactics that reliably help
+
+Most of these are general prompt-craft that transfers well to Flux/Leonardo;
+where something is measured specifically on these models it says so.
+
+1. **Name a real camera + lens for photoreal** — "shot on a Sony A7 IV,
+   85mm f/1.4" gives the model concrete depth-of-field/perspective cues.
+2. **Give age + concrete features for people** — "a woman in her 30s with
+   short curly black hair and freckles" beats "a person."
+3. **Name materials and textures** — "brushed aluminium," "frosted glass,"
+   "worn leather" render more specifically than "metal/glass/leather."
+4. **Use strong action verbs** — "mid-stride," "leaning over the counter,"
+   "reaching upward" — not "doing something."
+5. **State the lighting** — direction, quality, colour ("soft window light
+   from the left," "hard golden-hour backlight"). Missing lighting is the
+   single biggest quality gap.
+6. **Direct the composition** — shot type, angle, framing — or you get
+   generic centered results.
+7. **Lock the art style** for illustration/consistency (see the 5-component
+   note).
+8. **For products, say "clearly visible / prominently shown"** so the key
+   object or label isn't hidden or cropped.
+9. **Prestigious context anchors** ("Vogue editorial," "National Geographic
+   cover," "Architectural Digest interior") tend to nudge composition and
+   lighting upward — generally helpful, unverified on these specific models,
+   so drop them if they don't help.
+
+## Anti-patterns (what not to do)
+
+- **Describing the concept, not the image** — "a moody ad about
+  perseverance" gives the model nothing to draw. Describe the actual scene
+  that conveys it.
+- **Vague adjectives** — "modern, clean, professional, cool" mean nothing
+  visually. Replace with concrete art direction.
+- **Tag-list prompts** — "car, sunset, mountains, cinematic, 4k."
+- **Describing what the viewer should feel** instead of what creates the
+  feeling.
+- **Keyword-stuffing quality terms** — "8K, masterpiece, ultra-detailed"
+  adds noise, not quality.
+
+## Proven templates
+
+Starting points — adapt, don't paste verbatim. Fill the brackets, keep the
+prose flowing.
+
+**Photoreal / portrait:**
+```
+[Subject: age + appearance + expression], [action/pose], [setting + time of
+day]. [One or two micro-details: skin texture, stray hair, fabric]. Shot on
+[camera + lens at f-stop], [lighting direction + quality]. [Optional
+prestigious reference].
+```
+
+**Product / commercial:**
+```
+[Product with any brand/label] [clearly visible], [dynamic element:
+condensation / splash / motion], on [surface/setting]. [Supporting elements:
+light rays, reflections, particles]. Studio commercial photography,
+[lighting style]. [Optional publication reference].
+```
+
+**Logo / icon:**
+```
+A [flat vector / minimalist] logo of [subject], [construction: geometric,
+negative space], [2-3 colour palette with hex if known], centered on a
+[solid colour] background, legible at small sizes.
+```
+
+**Illustration / character:**
+```
+A [art style] illustration of [subject with distinctive features], [pose +
+expression], [colour palette]. [Line style] with [shading technique].
+Background: [description]. [Mood].
+```
+
+**Text-bearing asset** (keep text short — see "In-image text"):
+```
+A [asset type] with the text "[exact text]" in [font style], [placement].
+[Layout]. [Colour scheme]. [Supporting visual context].
+```
+
+## Adapting prompts from Midjourney / DALL-E
+
+If a user pastes a prompt written for another tool, convert it — don't pass
+it through:
+
+| Source syntax | cf-image equivalent |
+|---|---|
+| `--ar 16:9` | drop it, pass `--aspect-ratio 16:9` to the script |
+| `--v 6`, `--style raw`, `--niji` | remove — no version/style flags here |
+| `--chaos 50` | describe the variety in words ("unexpected, surreal composition") |
+| `--no trees` | positive reframing ("an open clearing, bare ground") |
+| `(word:1.5)` weight | descriptive emphasis ("prominently featuring [word]") |
+| `8k, masterpiece, hyperdetailed` | delete — low-value filler here |
+| comma-separated tag list | rewrite as flowing descriptive sentences |
+| `shot on Hasselblad, 80mm` | keep — camera/lens specs work well |
+
 ## Aspect ratio by use case
 
 `--aspect-ratio` is client-side shorthand, computed against the same
@@ -154,6 +272,22 @@ short label in the prompt so the model knows which reference maps to which
 role — e.g. "combine the character from the first reference image with the
 background style from the second reference image," rather than leaving it
 to infer which reference means what.
+
+## Keeping a subject consistent across images
+
+To keep the same character/object across several images (a character sheet,
+a series, a before/after):
+- **Best:** pass the approved image as a `--reference-image` for each new
+  generation, and describe the new pose/scene as the delta.
+- **Without a reference:** repeat 2-3 strong identifying anchors verbatim in
+  every prompt — the exact same phrasing for the distinctive traits (hair
+  colour/length, a specific garment, eye colour, a marking). Consistency
+  degrades the more the wording drifts between prompts, so copy the anchor
+  phrases rather than paraphrasing them each time.
+- Matching a real subject from a photo (e.g. a specific pet) usually needs
+  the reference image **plus** an explicit written description of its
+  distinguishing features, and often a couple of rounds — see the reference-
+  image rules above.
 
 ## Common mistakes
 
