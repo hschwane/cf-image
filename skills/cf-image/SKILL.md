@@ -234,6 +234,13 @@ read their bytes. This holds for the CLI, the desktop app, the web app and
 mobile alike. Don't promise otherwise, and don't go hunting for a cached
 copy in temp folders or app data — there isn't one.
 
+**And you cannot write the attachment out yourself.** You receive an
+attached image as perception, not as data — you have no access to its byte
+sequence. Any base64 you produced would be *invented*, yielding a corrupt
+file rather than an approximate image. Never attempt it. (The asymmetry:
+when a *script* reads a file, the script has the bytes; when *you* look at
+an image, nobody does.)
+
 Say so plainly when it comes up, then offer these, in order:
 
 1. **A direct image URL — the only route that works on every surface.**
