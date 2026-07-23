@@ -49,6 +49,20 @@ following ideas were directly adapted from banana-claude's design:
 - **README Quickstart style** — the fenced-code-block "install then try
   these commands" format in this README's Quickstart section follows
   banana-claude's README structure.
+- **SKILL.md structure** — the "read these files first" gate at the top,
+  the always-read-vs-load-on-demand split across reference files (each
+  starting with a one-line load directive), and the Quick Reference command
+  table follow banana-claude's `skills/banana/SKILL.md` structure closely.
+- **The prompt-engineering reference's shape** — a 5-component formula
+  taught through contrastive Good/Bad example pairs, plus per-domain named
+  vocabulary libraries, follows the structure of banana-claude's
+  `references/prompt-engineering.md`.
+- **The post-processing reference** — resize/crop/format-conversion via
+  shelling out to ImageMagick/FFmpeg (not an npm dependency), and the
+  green-screen-prompt-then-chroma-key pipeline for producing real
+  transparent PNGs (since neither Gemini nor these Flux/Leonardo models
+  output alpha natively), is adapted from banana-claude's
+  `references/post-processing.md`.
 
 What's original to cf-image, not adapted from banana-claude:
 
@@ -60,9 +74,13 @@ What's original to cf-image, not adapted from banana-claude:
 - The cheapest-model-by-default budget-gate policy and the free-tier
   hard-block-vs-billed-overage distinction (Workers Free vs Workers Paid).
 - The Node.js implementation itself.
-- banana-claude's `edit`/`chat`/`inspire` modes and self-promotional
-  "community footer" were deliberately **not** ported — see
-  `skills/cf-image/SKILL.md`'s "Not implemented" section for why.
+- cf-image's "edit" and "chat" (multi-turn refinement) workflows reach the
+  same end-user capability as banana-claude's, but by a different mechanism
+  it doesn't rely on: reference-image conditioning plus the conversation
+  itself acting as session state, no MCP server/session concept involved.
+  banana-claude's large bundled "inspire" prompt-idea database was not
+  ported — inspection of its own repo found the claimed database isn't
+  actually bundled there either, so it wasn't worth replicating.
 
 If you maintain banana-claude and would like anything here credited
 differently, or want a change to how this notice describes the relationship,

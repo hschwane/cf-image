@@ -41,6 +41,8 @@ about it.
 | Want to... | Say something like... |
 |---|---|
 | Generate one image | "generate a logo for my app, featuring..." |
+| Edit an existing image | "using this image at `<path>`, change the background to a beach" |
+| Keep refining a result across turns | "make the cat look less cartoony" — right after a previous generation, no special syntax needed |
 | Get several options to pick from | "give me 4 variations of a rocket ship icon" |
 | Control framing | "...in 16:9" / "a square icon" / "portrait/mobile format" |
 | Use a specific or higher-quality model | "use flux-2-dev for this" / "I want the best quality" — otherwise the skill recommends one and asks first, it never switches silently |
@@ -49,11 +51,8 @@ about it.
 | Save a brand/style preset | "save these brand colors and style as 'acme'" |
 | Reuse a saved preset | "generate a banner using the acme preset" |
 | List / inspect / delete presets | "what presets do I have saved?" / "delete the acme preset" |
-| Attach a reference image *(experimental)* | "using this image at `<path>` as reference, generate..." — untested against the live API, the skill will flag this when used |
-
-Each of these is backed by one of the scripts in `skills/cf-image/scripts/`
-(see "Scripts" below) — and for anyone coming from banana-claude, `SKILL.md`
-has an exact `/banana` → cf-image command-mapping table.
+| Resize/crop/convert/make transparent | "crop this to a square" / "make the background transparent" |
+| Set up cf-image | "set up cf-image" — or just ask for an image; a failed first-run check walks you through it |
 
 ## Install
 
@@ -82,7 +81,19 @@ enough to get started).
    - Permission: **Account → Account Analytics → Read** (optional but
      recommended, needed for `cost.js`/budget checks)
    - Account resource: scope it to your account.
-4. **Set the environment variables** so the plugin's scripts can find them:
+4. **Set the environment variables** so the plugin's scripts can find them.
+   Two options — pick whichever fits:
+
+   **Claude Code's own settings** (recommended if cf-image is only used
+   inside Claude Code): add an `env` block to `.claude/settings.json` (or
+   `.claude/settings.local.json` to keep it out of git):
+   ```json
+   { "env": { "CF_ACCOUNT_ID": "<your-account-id>", "CF_API_TOKEN": "<your-token>" } }
+   ```
+   Applies live, no restart needed — but only within Claude Code (CLI and
+   desktop app), not claude.ai's web app.
+
+   **OS-level environment variables** (works everywhere):
 
    **Windows (PowerShell)**:
    ```powershell
@@ -128,9 +139,12 @@ can do. What it does on every request:
    when the task has a real need the cheap models are known to be weak at
    (legible text, close-range photorealism, complex composition). It always
    asks before spending on anything beyond the cheap tier.
-4. **Generates** a single image or a batch of variations to choose from.
-5. **Reports back** the file path, the actual prompt used, the model, and
-   the real cost in neurons.
+4. **Generates** a single image, a batch of genuinely varied options, or an
+   edit/refinement of an existing image (its own or one you provide) using
+   reference-image conditioning.
+5. **Reports back** the actual image, the file path, the prompt used, the
+   model, and the real cost in neurons — with a running total for the
+   session, and a budget warning if you're getting close to the daily cap.
 
 Full behavioral details (the exact workflow, budget policy, and known
 model quirks) live in [`skills/cf-image/SKILL.md`](skills/cf-image/SKILL.md)
@@ -149,10 +163,10 @@ allocation (10,000 neurons/day, resets 00:00 UTC).
 | Cheap | `klein4b` (default), `schnell` | Used automatically, no confirmation |
 | Costly | `klein9b`, `phoenix`, `lucid`, `dev` | Requires explicit opt-in (the skill asks first; `dev` alone is ~75% of the daily allocation per image) |
 
-Full pricing detail, measured quirks (multipart requirements, a raw-binary
-response format, a safety-filter false positive on `klein4b`, and why its
-0-cost is flagged as a likely pricing bug rather than a real free model),
-researched strengths/weaknesses per model, and prompting guidance live in
+Full pricing detail (including how `klein4b`'s cost scales once output
+exceeds 1024x1024), measured quirks (multipart requirements, a raw-binary
+response format, a safety-filter false positive on `klein4b`), researched
+strengths/weaknesses per model, and prompting guidance live in
 [`skills/cf-image/references/`](skills/cf-image/references/).
 
 ## Scripts (for reference — the skill drives these for you)
@@ -160,32 +174,37 @@ researched strengths/weaknesses per model, and prompting guidance live in
 | Script | Purpose |
 |---|---|
 | `validate.js` | Check env vars + API access work in this environment |
-| `generate.js` | Generate one image (supports `--aspect-ratio`, `--preset`, experimental `--reference-image`) |
-| `batch.js` | Generate N variations of one prompt |
-| `models.js` | List models, tiers, pricing, strengths/weaknesses |
+| `generate.js` | Generate one image (supports `--aspect-ratio`, `--preset`, `--reference-image` up to 4x) |
 | `cost.js` | `today` (default): usage + remaining budget, warns at 60% used. `estimate --model <key> --count <n>`: cost of a planned generation, no API call |
 | `presets.js` | Manage saved brand/style presets (`list`/`show`/`create`/`delete`) |
 
-All zero-dependency Node.js (built-ins only — `fetch`, `FormData`, `fs`,
-`path`, `os`; no `npm install` step). Full usage/flags for each are
-documented in [`SKILL.md`](skills/cf-image/SKILL.md).
+There's no batch script — the skill generates variations by calling
+`generate.js` several times with genuinely different prompts (identical
+prompts repeated N times produce near-identical results), and no separate
+model-listing script — model pricing/strengths live in
+[`skills/cf-image/references/models.md`](skills/cf-image/references/models.md)
+for the skill to read directly. All zero-dependency Node.js (built-ins
+only — `fetch`, `FormData`, `fs`, `path`, `os`; no `npm install` step). Full
+usage/flags for each are documented in
+[`SKILL.md`](skills/cf-image/SKILL.md).
 
 ## Known limitations
 
-- **Reference-image conditioning** (`--reference-image`) is confirmed
-  working on `klein4b` (genuine image editing/compositing, not just
-  inspiration — see `skills/cf-image/references/models.md`), but note it's
-  **not free**: unlike plain `klein4b` generation it bills per input tile.
-  `klein9b`/`dev` support is still unconfirmed (assumed by family
-  similarity only).
+- Reference-image conditioning bills a per-input-tile cost even on
+  `klein4b`, which is otherwise free at up to 1024x1024 output — see
+  [`skills/cf-image/references/models.md`](skills/cf-image/references/models.md)
+  for the full pricing breakdown, including how cost scales at higher
+  output resolutions.
 - `google/nano-banana-2-lite` (Google, via AI Gateway) is documented but not
   wired up — it's a separate billing system (gateway balance/BYOK) outside
   Workers AI neurons.
-- No multi-turn "chat" sessions or a bundled prompt-idea database — see
-  `SKILL.md`'s "Not implemented" section for why.
-- Aspect ratios other than the 1024x1024 square default are implemented
-  (`--aspect-ratio`) but not yet exercised against the live API — treat
-  non-square output as unverified until confirmed.
+- No bundled prompt-idea database.
+- Aspect ratios other than the 1024x1024 square default are computed
+  client-side but not yet exercised against the live API — treat non-square
+  output as unverified until confirmed.
+- Post-processing (resize/crop/transparency) shells out to ImageMagick/
+  FFmpeg, which must be installed separately — see
+  [`skills/cf-image/references/post-processing.md`](skills/cf-image/references/post-processing.md).
 
 ## License
 

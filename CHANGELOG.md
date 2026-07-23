@@ -3,6 +3,98 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.4.0 — 2026-07-23
+
+Full restructuring of the skill/reference/script layer, informed by the
+live testing session in 0.3.1/0.3.2 and a direct structural comparison
+against banana-claude's own skill files.
+
+**Removed**
+- `scripts/batch.js` — running an identical prompt N times produced
+  near-identical variations in testing. Variations are now Claude calling
+  `generate.js` several times with genuinely different prompts.
+- `scripts/models.js` — was a pure re-formatting of static catalog data;
+  duplicated `references/models.md`. Model guidance is now read directly
+  from that file, not run as a script.
+- `MODEL_CATALOG`'s `notes`/`bestFor`/`weakerFor` fields in `core.js` — that
+  prose now lives once, in `references/models.md`, instead of twice.
+- SKILL.md's "Not implemented" / banana-claude-comparison framing, and all
+  "confirmed/unconfirmed" hedging on reference-image support — it's
+  documented as a plain model capability now.
+
+**Added**
+- Three new on-demand reference files: `references/setup.md` (moved out of
+  SKILL.md/README, plus a documented option to set `CF_ACCOUNT_ID`/
+  `CF_API_TOKEN` via Claude Code's own `settings.json` `env` block instead
+  of OS-level env vars), `references/post-processing.md` (ImageMagick/
+  FFmpeg shell-out recipes, including a green-screen-prompt + chroma-key
+  pipeline for real transparent PNG output), and `references/presets.md`
+  (moved out of scattered mentions in `prompting.md`/SKILL.md).
+- `references/prompting.md`: expanded domain-lens vocabulary, a Good/Bad
+  contrastive table for the 5-component formula, a prompt-length guide, a
+  measured finding on negative prompts (only `phoenix` has a real
+  `negative_prompt` API parameter — every other model needs positive
+  rephrasing instead), and a new "editing via reference images" section
+  distilled from this session's iteration (small/targeted edits work well;
+  large changes need very explicit spatial language and often cost less as
+  a fresh generation than as many reference-image rounds).
+- `references/models.md`: corrected resolution-cost finding — `klein4b`
+  bills 0 neurons up to 1024x1024 output, then scales *linearly with excess
+  pixels* beyond that (not a tile-bucket jump); input-tile and
+  output-resolution costs are independent and additive.
+- SKILL.md: full rewrite — an explicit always-read-vs-on-demand file list,
+  a Quick Reference table (Interactive/Generate/Edit/Chat/Batch/Setup/
+  Preset/Cost, described without script names), explicit answering rules
+  (always show the image, state path/prompt/settings/cost, keep a running
+  session cost total, periodically recheck real usage, build an Artifact
+  mini-portfolio instead of dumping more than ~4 images inline).
+- A documented "chat" (multi-turn refinement) workflow: no new
+  infrastructure needed — the conversation itself is the session, and the
+  most recently generated image becomes the next reference image.
+
+**Also, from a systematic comparison against banana-claude's actual skill
+files** (see "Why" below): `core.js` now retries transient errors (429s
+that aren't the daily-quota block, and 5xx) with short backoff instead of
+failing immediately; presets gained a `defaultAspectRatio` field; and
+`references/prompting.md` gained an aspect-ratio-by-use-case table, two
+more domain lenses (Infographic, Abstract), in-image text quoting/length/
+placement guidance, a common-edit-phrasing cheat sheet, multi-reference-
+image guidance, an expanded safety-filter rephrase-strategy table, and a
+couple of common-mistakes entries. SKILL.md's error-handling table gained a row for "generation succeeded but
+the user doesn't like the result," plus a "fallback model also blocked"
+clause folded into the existing safety-filter row, and its Answering rules
+gained an optional refinement-suggestion step. Also fixed from this same
+review pass: `core.js` had leftover "experimental/untested" hedging on
+reference-image support that contradicted the plainly-documented capability
+in `references/models.md`; `presets.js create` now validates
+`--default-model`/`--default-aspect-ratio` at creation time instead of
+failing silently until first use; `generate.js` no longer risks overwriting
+a same-second, same-prompt-prefix output file (adds a `-2`/`-3` suffix on
+collision).
+
+**Why**: a systematic comparison against banana-claude's actual skill files
+found our SKILL.md was long but unspecific, had real data duplication
+between `core.js` and `references/models.md`, and was missing several
+things banana-claude does well (a proper prompting guide, on-demand setup/
+post-processing/preset references, explicit answering-format rules). This
+release addresses those gaps directly rather than incrementally.
+
+## 0.3.2 — 2026-07-23
+
+Live creative-iteration session (octopus vs. kung-fu cat): full-HD render,
+reference-image editing across several rounds, and a 5-image anime-style
+batch — all cheap-tier, well within the daily budget.
+
+- Added `--reference-image` support to `batch.js` (previously `generate.js`
+  only) — confirmed working across a 5-image batch, one reference image
+  applied to every variation.
+- **Measured: reference-image edit cost scales sharply with output
+  resolution.** ~5.37 neurons at the default 1024x1024, but ~107.2 neurons
+  at 1920x1080 (~20x, well beyond the ~2x pixel-count increase alone) — see
+  `references/models.md` for the full note.
+- Fixed the same output-filename trailing-`.` bug in `batch.js`'s timestamp
+  slice that 0.3.1 fixed in `generate.js`.
+
 ## 0.3.1 — 2026-07-23
 
 First live end-to-end test run of the plugin (via the actual skill, loaded

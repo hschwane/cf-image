@@ -2,7 +2,7 @@
 "use strict";
 /**
  * Manage named brand/style presets, merged into prompts via --preset on
- * generate.js/batch.js. Stored as one JSON file per preset under
+ * generate.js. Stored as one JSON file per preset under
  * ~/.cf-image/presets/ (override with CF_IMAGE_HOME).
  *
  * Design adapted from the banana-claude plugin's preset system - see NOTICE.md.
@@ -37,12 +37,15 @@ function cmdList() {
 
 function cmdShow(name) {
   const p = core.getPreset(name);
-  for (const field of ["description", "colors", "style", "typography", "lighting", "mood", "defaultModel"]) {
+  for (const field of ["description", "colors", "style", "typography", "lighting", "mood", "defaultModel", "defaultAspectRatio"]) {
     if (p[field] !== undefined) console.log(`${field}: ${Array.isArray(p[field]) ? p[field].join(", ") : p[field]}`);
   }
 }
 
 function cmdCreate(name, args) {
+  if (args["default-model"]) core.getModel(args["default-model"]); // throws on an unknown key
+  if (args["default-aspect-ratio"]) core.parseAspectRatio(args["default-aspect-ratio"]); // throws on a malformed ratio
+
   const data = {
     description: args.description,
     colors: args.colors ? args.colors.split(",").map((c) => c.trim()) : undefined,
@@ -51,6 +54,7 @@ function cmdCreate(name, args) {
     lighting: args.lighting,
     mood: args.mood,
     defaultModel: args["default-model"],
+    defaultAspectRatio: args["default-aspect-ratio"],
   };
   const saved = core.savePreset(name, data, !!args.force);
   console.log(`Saved preset '${name}':`);

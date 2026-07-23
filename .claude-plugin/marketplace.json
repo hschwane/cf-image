@@ -14,7 +14,7 @@
       "homepage": "https://github.com/hschwane/cf-image",
       "repository": "https://github.com/hschwane/cf-image",
       "license": "MIT",
-      "keywords": ["image-generation", "ai-art", "cloudflare", "workers-ai", "flux"],
+      "keywords": ["image-generation", "ai-art", "cloudflare", "workers-ai", "flux", "leonardo", "creative-director"],
       "category": "creative"
     }
   ]

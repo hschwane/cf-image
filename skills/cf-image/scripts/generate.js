@@ -9,7 +9,7 @@
  *   node generate.js --prompt "..." --preset tech-saas
  *   node generate.js --prompt "..." --aspect-ratio 16:9
  *   node generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
- *     (EXPERIMENTAL/UNTESTED - see references/models.md)
+ *     (repeatable up to 4x - see references/models.md for per-model support)
  */
 const path = require("path");
 const core = require("./core");
@@ -32,11 +32,13 @@ async function main() {
   }
 
   let prompt = args.prompt;
+  let presetAspectRatio;
   if (args.preset) {
     try {
       const preset = core.getPreset(args.preset);
       prompt = core.applyPreset(prompt, preset);
       if (preset.defaultModel && !args.model) model = preset.defaultModel;
+      presetAspectRatio = preset.defaultAspectRatio;
       console.log(`Prompt (with preset '${args.preset}' applied): ${prompt}`);
     } catch (e) {
       console.error(`Error: ${e.message}`);
@@ -45,9 +47,13 @@ async function main() {
     }
   }
 
+  // Explicit --width/--height/--aspect-ratio always wins over a preset's
+  // defaultAspectRatio, which only fills in what the user didn't specify.
+  const aspectRatio = args["aspect-ratio"] || (!args.width && !args.height ? presetAspectRatio : undefined);
+
   let width, height;
   try {
-    ({ width, height } = core.resolveDimensions({ width: args.width, height: args.height, aspectRatio: args["aspect-ratio"] }));
+    ({ width, height } = core.resolveDimensions({ width: args.width, height: args.height, aspectRatio }));
   } catch (e) {
     console.error(`Error: ${e.message}`);
     process.exitCode = 1;
@@ -55,14 +61,11 @@ async function main() {
   }
 
   const referenceImagePaths = args["reference-image"] || [];
-  if (referenceImagePaths.length) {
-    console.log(`WARNING: reference-image support is experimental/untested (${referenceImagePaths.length} image(s) attached). Report back if this works or fails.`);
-  }
 
   let outFile = args["out-file"];
   if (!outFile) {
     const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-    outFile = path.join(core.defaultOutputDir(), `${stamp}-${model}-${core.slugify(args.prompt)}.jpg`);
+    outFile = core.uniqueOutFile(path.join(core.defaultOutputDir(), `${stamp}-${model}-${core.slugify(args.prompt)}.jpg`));
   }
 
   try {

@@ -30,21 +30,17 @@ const BUDGET_WARNING_FRACTION = 0.6; // warn once daily usage crosses 60% of the
 // three (~75% of the whole daily allocation per image) - called out in its
 // own notes rather than as a separate code-level tier.
 
-// Pricing (neuronsPer1024) is MEASURED from real 1024x1024 generations
-// against a live account on 2026-07-22 - see references/models.md for the
-// full writeup of per-model quirks (multipart requirements, a raw-binary
-// response format, a safety-filter false positive, etc).
+// This catalog is the technical/machine-readable source of truth (pricing,
+// request/response shape, reference-image support) used by the scripts
+// below. Pricing (neuronsPer1024) is MEASURED against a live account, not
+// copied from Cloudflare's published rates (those didn't always match).
+// Strengths/weaknesses, prompting notes, and full quirk writeups are
+// documentation, not code - they live in references/models.md, not here,
+// so this data has exactly one place it's duplicated.
 //
-// bestFor / weakerFor are distilled from published benchmarks, vendor docs,
-// and third-party comparisons (see references/models.md "Researched
-// characteristics" section for sources) - reputational, not measured by us.
-//
-// referenceImages: 'confirmed' means multi-reference conditioning
-// (input_image_0..input_image_3 multipart fields) has been exercised
-// against the live API and works. 'experimental' means Cloudflare's
-// changelog documents the same field naming for this model, by family
-// similarity to klein4b, but it hasn't been tested here yet - treat as
-// unconfirmed. false means no documented support at all.
+// referenceImages: true means input_image_0..input_image_3 multipart fields
+// are supported by this model - see references/models.md for capability
+// details.
 const MODEL_CATALOG = {
   schnell: {
     id: "@cf/black-forest-labs/flux-1-schnell",
@@ -53,10 +49,6 @@ const MODEL_CATALOG = {
     responseFormat: "json_base64",
     neuronsPer1024: 172.8,
     referenceImages: false,
-    notes:
-      "Fastest, 4-step distilled Flux. Good fallback for drafts when klein4b's safety filter blocks a prompt. Cost corrected 2026-07-23: a clean single-call header reading on a fresh day measured 172.8 neurons, not the 19.2 previously listed here (that figure was calculated from Cloudflare's published per-tile rate, not directly measured - same mistake we'd already caught for lucid-origin, just hadn't happened to catch for schnell until now). Still far cheaper than any costly-tier model.",
-    bestFor: ["rapid drafts", "exploring composition/ideas", "high-volume low-stakes images", "thumbnails"],
-    weakerFor: ["legible in-image text", "fine detail/complex hands", "photorealism at close range"],
   },
   klein4b: {
     id: "@cf/black-forest-labs/flux-2-klein-4b",
@@ -64,11 +56,7 @@ const MODEL_CATALOG = {
     requestFormat: "multipart",
     responseFormat: "json_base64",
     neuronsPer1024: 0,
-    referenceImages: "confirmed",
-    notes:
-      "Measured 0 neurons billed for plain text-to-image across every call so far (confirmed via header + GraphQL analytics), but this is SUSPECTED to be a pricing bug or promotional launch rate, not an intentionally permanent free model - a newer/better model than schnell being priced below it doesn't make architectural sense. Treat the 0 cost as fragile: re-check cost.js after using it, and if it ever reports nonzero neurons, move it out of the default slot (schnell is the natural fallback). Requires multipart/form-data. Safety filter can false-positive on innocuous prompts (error code 3030) - reword if blocked, or fall back to schnell. Reference-image conditioning CONFIRMED WORKING 2026-07-23 (see referenceImages) and is NOT free - billed 5.37 neurons for one input image, matching Cloudflare's documented input-tile rate exactly.",
-    bestFor: ["rapid drafts", "interactive/real-time iteration", "sub-second turnaround"],
-    weakerFor: ["legible in-image text (worse than klein9b)", "fine texture detail"],
+    referenceImages: true,
   },
   klein9b: {
     id: "@cf/black-forest-labs/flux-2-klein-9b",
@@ -76,10 +64,7 @@ const MODEL_CATALOG = {
     requestFormat: "multipart",
     responseFormat: "json_base64",
     neuronsPer1024: 1363.64,
-    referenceImages: "experimental",
-    notes: "Sharper/more coherent than klein-4b. ~13.6% of the daily free allocation per image.",
-    bestFor: ["near-production quality on a budget", "sharper faces/textures than the cheap tier", "most jobs without a hard legible-text requirement"],
-    weakerFor: ["legible in-image text (flux-2-dev is meaningfully better)"],
+    referenceImages: true,
   },
   phoenix: {
     id: "@cf/leonardo/phoenix-1.0",
@@ -88,10 +73,6 @@ const MODEL_CATALOG = {
     responseFormat: "raw_binary",
     neuronsPer1024: 3120,
     referenceImages: false,
-    notes:
-      "Leonardo Phoenix. Returns RAW image bytes directly (Content-Type: image/jpeg, no JSON wrapper, no per-request neuron header) - actual cost only visible afterwards via cost.js.",
-    bestFor: ["complex multi-element/multi-constraint compositions", "logos, labels, posters, UI mockups needing legible text", "strict prompt adherence"],
-    weakerFor: ["close-range photorealism (weaker skin/material realism than lucid)", "deliberately unusual/impossible prompts (can 'correct' them)"],
   },
   lucid: {
     id: "@cf/leonardo/lucid-origin",
@@ -100,9 +81,6 @@ const MODEL_CATALOG = {
     responseFormat: "json_base64",
     neuronsPer1024: 3904.69,
     referenceImages: false,
-    notes: "Leonardo flagship. Best prompt adherence/polish of the Cloudflare-native models.",
-    bestFor: ["photorealistic portraits/products/architecture", "convincing skin/hair/material detail", "final production assets when unsure which model to pick"],
-    weakerFor: ["fastest iteration (favors quality over speed)"],
   },
   dev: {
     id: "@cf/black-forest-labs/flux-2-dev",
@@ -110,11 +88,7 @@ const MODEL_CATALOG = {
     requestFormat: "multipart",
     responseFormat: "json_base64",
     neuronsPer1024: 7500,
-    referenceImages: "experimental",
-    notes:
-      "Full (non-distilled) Flux.2. Best raw quality/detail and in-image text rendering, but ~75% of the ENTIRE daily free allocation for one image - far pricier than the other 'costly' models. Billed per step - actual cost can exceed this figure at non-default step counts.",
-    bestFor: ["legible in-image text/typography (best in the catalog)", "final production/marketing assets", "multi-reference brand/character consistency", "maximum photorealism"],
-    weakerFor: ["speed/cost - not for iteration or drafts"],
+    referenceImages: true,
   },
 };
 
@@ -122,6 +96,23 @@ const CHEAP_MODEL_KEYS = Object.keys(MODEL_CATALOG).filter((k) => MODEL_CATALOG[
 const CHEAPEST_MODEL_KEY = "klein4b"; // 0 measured neurons, but see the suspected-bug caveat in its notes above; schnell is the fallback
 
 class CfImageError extends Error {}
+
+// Avoids silently overwriting an existing file when two generations in the
+// same second produce the same timestamp+model+slug (e.g. batch variations
+// whose prompts share a long common prefix). Appends -2, -3, ... before the
+// extension until the path is free.
+function uniqueOutFile(outFile) {
+  if (!fs.existsSync(outFile)) return outFile;
+  const ext = path.extname(outFile);
+  const base = outFile.slice(0, -ext.length || undefined);
+  let i = 2;
+  let candidate;
+  do {
+    candidate = `${base}-${i}${ext}`;
+    i++;
+  } while (fs.existsSync(candidate));
+  return candidate;
+}
 
 function slugify(text, maxLen = 40) {
   const slug = text
@@ -150,7 +141,7 @@ function parseAspectRatio(ratioStr) {
   return { width: round64(w), height: round64(h) };
 }
 
-// Shared by generate.js/batch.js: explicit --width/--height wins if given,
+// Shared by generate.js: explicit --width/--height wins if given,
 // otherwise --aspect-ratio if given, otherwise the 1024x1024 default.
 function resolveDimensions({ width, height, aspectRatio }) {
   if (aspectRatio && (width || height)) {
@@ -246,15 +237,11 @@ async function generateImage({
   const entry = getModel(modelKey);
 
   if (referenceImagePaths.length) {
-    // EXPERIMENTAL / UNTESTED - see MODEL_CATALOG[key].referenceImages and
-    // references/models.md. Cloudflare's changelog documents this field
-    // naming for klein4b; we're assuming the same shape works for the other
-    // multipart models but have not confirmed it against the live API.
     // Checked before the budget gate: no --allow-expensive flag fixes an
     // unsupported-model request, so that's the more useful error to surface.
     if (entry.requestFormat !== "multipart" || !entry.referenceImages) {
       throw new CfImageError(
-        `Model '${entry.key}' has no documented reference-image support. Known candidates (untested): ` +
+        `Model '${entry.key}' has no reference-image support. Models that support it: ` +
           Object.keys(MODEL_CATALOG)
             .filter((k) => MODEL_CATALOG[k].referenceImages)
             .join(", ")
@@ -288,12 +275,19 @@ async function generateImage({
     headers["Content-Type"] = "application/json";
   }
 
-  const resp = await fetch(url, { method: "POST", headers, body });
-  const contentType = resp.headers.get("content-type") || "";
-  const neuronsHeader = resp.headers.get("cf-ai-neurons");
-  const buf = Buffer.from(await resp.arrayBuffer());
+  // Retry transient errors (429 that isn't the daily-quota block, or a 5xx)
+  // with short exponential backoff. The daily-quota block (code 4006) is not
+  // transient - fail immediately rather than retrying into a wall.
+  let resp, contentType, neuronsHeader, buf;
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    resp = await fetch(url, { method: "POST", headers, body });
+    contentType = resp.headers.get("content-type") || "";
+    neuronsHeader = resp.headers.get("cf-ai-neurons");
+    buf = Buffer.from(await resp.arrayBuffer());
 
-  if (!resp.ok) {
+    if (resp.ok) break;
+
     const errText = buf.toString("utf-8");
     if (errText.includes('"code":4006') || errText.includes("daily free allocation")) {
       throw new CfImageError(
@@ -302,7 +296,11 @@ async function generateImage({
           `overage automatically. Raw error: ${errText}`
       );
     }
-    throw new CfImageError(`Cloudflare API error (${resp.status}) for model ${entry.id}: ${errText}`);
+    const transient = resp.status === 429 || resp.status >= 500;
+    if (!transient || attempt === maxAttempts) {
+      throw new CfImageError(`Cloudflare API error (${resp.status}) for model ${entry.id}: ${errText}`);
+    }
+    await new Promise((r) => setTimeout(r, 1000 * attempt));
   }
 
   let neurons = null;
@@ -439,7 +437,7 @@ async function verifyToken() {
 // banana-claude plugin's preset system (see NOTICE.md for attribution).
 // ---------------------------------------------------------------------------
 
-const PRESET_FIELDS = ["description", "colors", "style", "typography", "lighting", "mood", "defaultModel"];
+const PRESET_FIELDS = ["description", "colors", "style", "typography", "lighting", "mood", "defaultModel", "defaultAspectRatio"];
 
 function sanitizePresetName(name) {
   const safe = name.replace(/[^a-zA-Z0-9_-]/g, "");
@@ -515,6 +513,7 @@ module.exports = {
   slugify,
   parseAspectRatio,
   resolveDimensions,
+  uniqueOutFile,
   estimateCost,
   cfImageHome,
   defaultOutputDir,

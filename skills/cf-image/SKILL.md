@@ -1,248 +1,227 @@
 ---
 name: cf-image
-description: Creative-director pipeline for generating images with Cloudflare Workers AI (Flux/Leonardo models). Use when the user asks to generate, draft, mock up, or produce an image, logo, icon, illustration, or visual asset, or explicitly invokes /cf-image. Always defaults to the cheapest viable model; proactively recommends (never silently switches to) a pricier model when the task genuinely needs it.
+description: Creative-director pipeline for generating and editing images with Cloudflare Workers AI (Flux/Leonardo models). Use for ANY request to generate, draft, mock up, edit, or produce an image, logo, icon, illustration, or visual asset, including multi-turn refinement of a previously generated image, batch variations, brand presets, and cost/budget questions. Always defaults to the cheapest viable model; proactively recommends (never silently switches to) a pricier one when the task genuinely needs it.
+argument-hint: "[generate|edit|chat|batch|setup|preset|cost] <request>"
 ---
 
 # cf-image: Cloudflare Workers AI Creative Director
 
 Turns a plain-language image request into a well-crafted prompt, picks a
-cost-appropriate model, generates it, and reports the real cost. Heavily
-inspired by [banana-claude](https://github.com/AgriciDaniel/banana-claude)'s
-"creative director" pattern (intent → domain → structured prompt → generate
-→ report) — adapted to target Cloudflare's Flux/Leonardo models instead of
-Gemini, built on Node.js instead of Python (Claude Code itself runs on Node,
-so it's guaranteed present everywhere this skill runs), and built around a
-hard policy: **always pick the cheapest model that will work, recommend
-rather than silently upgrade.** See `NOTICE.md` at the plugin root for the
-full attribution.
+cost-appropriate model, generates it, and reports the real cost and the
+actual image.
 
-Read `references/models.md` and `references/prompting.md` before crafting a
-prompt if this is the first `cf-image` use in the session — they contain
-measured pricing/quirks (multipart requirements, a raw-binary response
-format, a safety-filter false positive) AND researched strengths/weaknesses
-per model (what each is actually good/bad at), not obvious from Cloudflare's
-docs alone.
+## Read these first
 
-## Prerequisites
+- `references/prompting.md` — read before constructing any non-trivial
+  prompt. Skip only for a request so simple there's nothing to expand.
+- `references/models.md` — read before/while picking a model, at least once
+  per session.
 
-`CF_ACCOUNT_ID` and `CF_API_TOKEN` env vars must be set (the token needs
-`Workers AI: Run`, and `Account Analytics: Read` for cost checks — see the
-main `README.md` for the full account/token setup walkthrough). Run
-`node scripts/validate.js` in a new environment to confirm both are working
-before generating anything. All script paths below are relative to this
-skill's own directory (`skills/cf-image/`).
+On-demand only — read when their specific trigger below applies, not
+upfront:
+- `references/setup.md` — a new session's `validate.js` check fails, or the
+  user asks about setup/the Cloudflare token.
+- `references/post-processing.md` — the user needs resize/crop/format
+  conversion/transparency after generation.
+- `references/presets.md` — the request names a brand/style, or asks about
+  presets.
 
-## A note on "tiers"
+## Core principles
 
-Model `tier` (cheap/costly) is **relative cost within Workers AI**, not a
-"free plan vs. paid plan" distinction — every model draws from the same
-shared account-wide free daily allocation (10,000 neurons/day). Don't tell
-the user a "costly" model isn't free-tier-eligible; it is, it just eats the
-shared budget faster.
+- **Never pass raw user text unmodified to the API.** Always craft a proper
+  prompt first (`references/prompting.md`) — even a two-word request.
+- **Always default to the cheapest model that will work.** Recommend,
+  never silently switch to, a pricier one — and only when the task has a
+  real need the cheap tier is known to be weak at.
+- **Never report success until the output file is confirmed to exist.**
+- **Always show the actual generated image**, not just its path.
+- **Track and report real cost** — the actual neuron figure from this
+  generation, not a remembered or estimated one.
 
-## Core workflow
+## Quick reference
 
-1. **Understand intent.** What's this actually for — a logo, an app icon, a
-   blog header, a product shot, a throwaway draft? Ask only if genuinely
-   ambiguous; otherwise infer from context and proceed.
-2. **Pick a domain lens** (optional but improves output — see below) to steer
-   composition and vocabulary.
-3. **Construct the prompt.** Don't pass the user's raw phrasing straight
-   through if it's terse — expand it using the Subject / Action / Setting /
-   Composition / Style shape (details in `references/prompting.md`). Keep the
-   user's actual intent and any explicit constraints (brand name, colors,
-   exact text) verbatim and unambiguous. If a saved preset applies
-   (`presets.js list`), mention it and use `--preset <name>` rather than
-   re-describing the brand by hand.
-4. **Pick a model — cheapest by default, recommend rather than silently
-   upgrade.**
-   - Default: `klein4b` (currently billing 0 neurons — the literal cheapest
-     option, **but see the caveat below**, this may not stay true). If it
-     safety-filters a prompt (error 3030) or its output looks wrong for the
-     ask, fall back to `schnell` (also cheap-tier, ~173 neurons — still
-     trivial, but not as negligible as it was once documented) rather than
-     jumping straight to a costly model.
-   - **Caveat on `klein4b`'s 0 cost**: this is suspected to be a pricing bug
-     or promotional launch rate, not an intentional permanent free model —
-     it doesn't make architectural sense for a newer, better model to be
-     priced below `schnell`. Before relying on it in a cost-sensitive
-     context, a quick `node scripts/cost.js` check doesn't hurt. If it ever
-     reports nonzero neurons, treat `schnell` as the new default instead and
-     mention the change to the user.
-   - **Before generating**, check whether the ask has a real need a cheap
-     model is known to be weak at (see each model's `best_for`/`weaker_for`
-     in `references/models.md` — e.g. legible in-image text, close-range
-     photorealism, complex multi-constraint composition). If so, **say so and
-     recommend the better-suited model with its cost**. Get the exact figure
-     with `node scripts/cost.js estimate --model dev --count 1` rather than
-     quoting a remembered number — e.g. "klein4b/schnell tend to garble
-     in-image text — flux-2-dev renders it properly, ~$0.08/image, want me to
-     use that instead?" Then proceed with whatever the user confirms. Never
-     silently substitute a costlier model for what was asked.
-   - If the user already named a costly model or said "best quality" /
-     "final" / "production-ready" explicitly, that counts as opt-in — no
-     need to ask again, just confirm cost before spending if it's `dev`
-     specifically (disproportionately expensive within the costly tier).
-5. **Generate.** Call `generate.js` (single image) or `batch.js` (multiple
-   variations — default to this when the user wants options/choices).
-6. **Handle safety-filter blocks (error code 3030).** `klein4b` in particular
-   can false-positive on innocuous prompts. Don't just retry identically —
-   reword the prompt (soften action verbs, remove ambiguous phrasing) and
-   retry once, or fall back to `schnell`. If it blocks again, tell the user
-   and suggest they adjust the ask.
-7. **Report back.** Always state: the file path saved, the actual prompt
-   sent (if you expanded it), the model used, and the neuron cost (or "cost
-   pending — analytics lags a few minutes" if the model doesn't report a
-   per-request figure, i.e. `phoenix`).
+| Capability | Triggered by | What Claude does |
+|---|---|---|
+| **Interactive** | Any plain-language image request, no exact syntax needed | Infers intent, crafts a prompt, picks a model, generates, reports back |
+| **Generate** | "generate/create/make a..." | One image, cheapest tier by default |
+| **Edit** | "edit this image `<path>`...", "change X in this image to..." | Conditions on the existing image, prompts only the delta |
+| **Chat** (multi-turn refinement) | A follow-up tweak to "it"/"the last one" mid-conversation | Uses the most recently generated image as the reference, keeps iterating in place |
+| **Batch** | "give me N variations", "show me some options" | N distinctly varied prompts, one generation each — not the same prompt N times |
+| **Setup** | New session's validation fails, or "set up cf-image" | Walks `references/setup.md` |
+| **Preset** | "save this brand as...", "use the acme preset", preset questions | Reads `references/presets.md`, manages saved brand/style defaults |
+| **Cost** | Budget/cost questions | Reports real usage or a pre-spend estimate |
+
+## Workflow
+
+Follow this for every generation:
+
+1. **Understand intent.** Logo vs. draft vs. final asset? Ask only if
+   genuinely ambiguous; otherwise infer and proceed.
+2. **Check for a preset** if a brand/style is named (`references/presets.md`).
+3. **Pick a domain lens** (below) and construct the prompt with the
+   5-component formula (`references/prompting.md`). Keep the user's
+   explicit constraints (exact text, brand name, exact colors) verbatim.
+4. **Pick a model** — cheapest that'll work by default (`klein4b`, falling
+   back to `schnell` on a safety-filter block). Before generating, check
+   whether the request has a real need the cheap tier is weak at (legible
+   text, close-range photorealism, complex composition — see
+   `references/models.md`). If so, say so and recommend the better-suited
+   model with its real cost (`cost.js estimate`), then proceed with
+   whatever the user confirms. Never substitute a costlier model silently.
+5. **Generate.**
+6. **Handle errors** per "Error handling" below rather than reporting
+   success prematurely.
+7. **Report back** per "Answering" below.
 
 ## Domain lenses
 
-Use these to steer vocabulary and composition:
+| Lens | Use for |
+|---|---|
+| Logo/Icon | Brand marks, app icons |
+| Product/UI | Product shots, UI mockups |
+| Illustration/Character | Characters, storybook/cartoon art |
+| Photoreal/Cinematic | Photographs, cinematic scenes — usually worth recommending `lucid` |
+| Landscape/Environment | Scenery, establishing shots |
+| Infographic | Labeled diagrams, data-viz style layouts |
+| Abstract | Generative/fractal/geometric art |
 
-- **Logo/Icon** — flat vector, centered subject, simple solid-color
-  background (see "Transparency" in `references/prompting.md` — none of
-  these models confirmed to output alpha), legible at small sizes.
-- **Product/UI** — clean background, soft studio lighting, precise framing.
-- **Illustration/Character** — describe pose, expression, art style
-  explicitly (e.g. "flat vector illustration," "cartoon," "storybook").
-- **Photoreal/Cinematic** — name a camera/lens feel, lighting direction, film
-  stock or photographic reference if it helps ("shot on 35mm," "golden
-  hour"). Recommend `lucid` for this lens if the cheap-tier draft isn't
-  convincing enough.
-- **Landscape/Environment** — establish scale, time of day, weather/mood.
+Full named vocabulary per lens is in `references/prompting.md`.
 
-Pick framing with `--aspect-ratio` when it matters for the use case (e.g.
-`16:9` for a blog header, `9:16` for a mobile/story asset, `1:1` — the
-default — for an icon or square social post) rather than leaving everything
-at 1024x1024. See "Aspect ratios" below for the caveat on this.
+## Special workflows
+
+### Edit
+
+Trigger: an existing image path plus change instructions. Use a reference
+image (up to 4) with a prompt describing only the delta, not the whole
+scene — see `references/prompting.md`'s "Editing via reference images"
+section for how explicit and spatial the instruction needs to be. Same
+mechanism handles "give me variations of this existing image."
+
+### Chat (multi-turn visual refinement)
+
+Trigger: the user wants to keep tweaking a result across several turns.
+There's no separate session mechanism to invoke — the conversation itself
+is the session. Track the most recently generated/approved image's file
+path, and use it as the reference for the next request. Re-state any
+must-preserve detail explicitly on every follow-up edit (each edit call is
+independent and only "remembers" through the reference image itself, not
+through earlier correction requests).
+
+### Batch (variations)
+
+Trigger: "give me N variations," "show me some options." There is no batch
+script — generating the identical prompt N times produces near-identical
+results (confirmed by testing). Instead, draft N *meaningfully different*
+prompts that each still satisfy the request (vary style, angle,
+composition, or one specific attribute), and generate once per variation
+with its own output file. Default to 3-4 variations unless a count is
+given. Report per the batch rule under "Answering."
+
+### Setup
+
+Trigger: a new session's validation fails, or the user asks to set up
+cf-image / the Cloudflare token. Read `references/setup.md` in full and
+walk the user through it rather than recalling dashboard steps from memory.
+
+### Preset
+
+Trigger: a brand/style is named, or the user asks about presets. Read
+`references/presets.md`.
+
+### Cost
+
+Trigger: a budget or cost question. Report real numbers from a usage check
+or pre-spend estimate — never a remembered figure.
 
 ## Budget policy (hard rule)
 
-- Cheap-tier models (`klein4b`, `schnell`) run without asking.
-- Costly-tier models (`klein9b`, `phoenix`, `lucid`, `dev`) require the user
-  to opt in for that specific generation — either by naming the
-  model/quality bar explicitly, or by confirming after you recommend one per
-  the workflow above. `dev` is far pricier than the other three (~75% of the
-  *entire* daily free allocation per image) — worth a second confirmation
-  even after general opt-in to "costly."
-- Before spending on a costly model, run `node scripts/cost.js` to check
-  remaining daily budget, especially later in a session. `generate.js` and
-  `batch.js` also print a warning automatically right after a successful
-  generation once usage crosses 60% of the daily allocation (best-effort —
-  it won't fail the generation if the check itself can't run, e.g. missing
-  `Account Analytics: Read`) — pass that warning along to the user verbatim
-  when it shows up. This account is on the **Workers Free plan**: exceeding
-  10,000 neurons/day doesn't bill overage,
-  it **hard-blocks all further Workers AI requests** (HTTP 429, code 4006)
-  until reset at 00:00 UTC. If that happens, tell the user plainly and give
-  the reset time — don't retry in a loop.
-- Good pattern: iterate cheaply with `klein4b`/`schnell` via `batch.js`
-  until the user likes a direction, *then* offer to regenerate that one
-  winning prompt on a costlier model for the final asset.
+- Cheap tier (`klein4b`, `schnell`) runs without asking.
+- Costly tier (`klein9b`, `phoenix`, `lucid`, `dev`) requires the user to
+  opt in for that specific generation — either by naming the model/quality
+  bar, or by confirming after a recommendation. `dev` needs a second
+  confirmation even after general costly opt-in — it alone is ~75% of the
+  entire daily allocation per image. This `dev`-specific step is enforced by
+  Claude following this policy, not by the script — `--allow-expensive`
+  gates the whole costly tier at once, it has no per-model distinction.
+- This account is on the **Workers Free** plan: exceeding 10,000
+  neurons/day hard-blocks further requests (HTTP 429, code 4006) until
+  00:00 UTC reset — it does **not** bill overage. If this happens, tell the
+  user plainly and give the reset time; don't retry in a loop.
+- Good pattern: iterate cheap, then regenerate the winning prompt on a
+  pricier model for the final asset.
+
+## Error handling
+
+| Symptom | Response |
+|---|---|
+| Safety-filter block (error 3030) | Don't retry identically — reword per `references/prompting.md`, retry once, then fall back to `schnell`. If `schnell` also blocks it, stop and tell the user plainly rather than escalating to a costlier model |
+| HTTP 429 / code 4006 | Daily free allocation exhausted — tell the user the reset time, don't retry in a loop (transient rate-limit 429s are already retried automatically inside `generate.js`) |
+| Missing `CF_ACCOUNT_ID`/`CF_API_TOKEN` | Point the user to `references/setup.md` |
+| Reference image rejected client-side | That model doesn't support it (`schnell`/`phoenix`/`lucid`) — use `klein4b`/`klein9b`/`dev` instead |
+| Post-processing tool missing | Tell the user what to install (`references/post-processing.md`) — don't fake success |
+| Output file missing after a call that reported success | Treat as a failure, don't tell the user it worked |
+| Generation succeeded but the user doesn't like the result | Not a script error — revisit the prompt using the 5-component formula and "Common mistakes" in `references/prompting.md` rather than just re-rolling the same prompt |
+
+## Answering
+
+After every generation:
+
+1. **Show the actual image**, not just a path.
+2. State the **file path**, the **actual prompt sent**, the **model**, and
+   the **resolution/settings** used.
+3. State the **real cost** in neurons (+ USD equivalent) for this
+   generation, and mention the **running total for this session** so far.
+4. Periodically — every few generations, and always before a costly-tier
+   spend — re-check real daily usage (not just the session running total,
+   since usage can exist outside this conversation) and warn the user if
+   getting close to the cap.
+5. For more than ~4 images at once, don't dump every one inline — build an
+   Artifact presenting all of them as a numbered mini-portfolio (image,
+   prompt, settings per entry) so the user can compare and pick. Four or
+   fewer: show them inline.
+6. If relevant, offer 1-2 concrete refinement ideas (a different angle, a
+   model worth trying for a specific weakness, a pose/lighting tweak) —
+   don't pad this if the result already looks like a solid match.
 
 ## Script reference
 
+Scripts are helpers for API calls and repeatable mechanics, not a command
+set matched 1:1 to user requests — there's no "batch script" or "chat
+script." Batch and chat are things Claude does with judgment, by calling
+`generate.js` several times, not by running a different script.
+
 ```bash
-# One-time: confirm env vars + API access work in this environment
+# One-time per environment / start of a new session
 node scripts/validate.js
 
-# List all models with tier, measured neuron cost, and researched strengths/weaknesses
-node scripts/models.js
-
-# Single image, cheapest tier by default
+# Generate one image, cheapest tier by default
 node scripts/generate.js --prompt "..."
 
-# Single image, costly-tier model (only after user opts in)
+# Costly-tier model (only after the user opts in)
 node scripts/generate.js --prompt "..." --model lucid --allow-expensive
 
-# Custom framing instead of the 1024x1024 default (see "Aspect ratios" below)
+# Custom framing instead of the 1024x1024 default
 node scripts/generate.js --prompt "..." --aspect-ratio 16:9
 
-# N variations for the user to pick from (defaults to the cheapest model)
-node scripts/batch.js --prompt "..." --count 4
+# Apply a saved preset
+node scripts/generate.js --prompt "..." --preset acme
 
-# Apply a saved brand/style preset
-node scripts/generate.js --prompt "a rocket icon" --preset tech-saas
+# Edit / condition on up to 4 existing images
+node scripts/generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
 
 # Manage presets
 node scripts/presets.js list
-node scripts/presets.js create tech-saas --style "..." --colors "#2563EB,#F8FAFC" --mood "professional"
+node scripts/presets.js show acme
+node scripts/presets.js create acme --description "..." --colors "#FF6B00,#111111" --style "..."
+node scripts/presets.js delete acme --confirm
 
-# Today's real neuron usage + remaining free budget (warns at 60% used)
+# Today's real usage + remaining budget
 node scripts/cost.js
 
-# Estimate a generation's cost BEFORE spending anything (no API call)
+# Estimate a cost before spending anything (no API call)
 node scripts/cost.js estimate --model dev --count 3
-
-# EXPERIMENTAL/UNTESTED - reference-image conditioning, klein4b/klein9b/dev only
-node scripts/generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
 ```
 
-### Aspect ratios
-
-`--aspect-ratio W:H` (e.g. `16:9`, `9:16`, `4:3`, `21:9`) is a convenience
-shorthand computed client-side — it targets roughly the same total pixel
-count as the 1024x1024 default, rounded to multiples of 64. Mutually
-exclusive with `--width`/`--height` (pass one or the other, not both). Only
-square 1024x1024 has actually been exercised against the live API — other
-ratios/resolutions are untested per-model, same status as reference images
-below. Mention this if a user asks and the result looks off.
-
-### Command reference vs. banana-claude
-
-For anyone familiar with banana-claude's `/banana` commands, here's how they
-map (see `NOTICE.md` for what was directly adapted vs. built independently):
-
-| banana-claude | cf-image equivalent |
-|---|---|
-| `/banana generate <idea>` | `generate.js` (skill crafts the prompt first) |
-| `/banana batch <idea> [N]` | `batch.js --count N` |
-| `/banana preset [list\|create\|show\|delete]` | `presets.js` — same subcommands |
-| `/banana cost [today\|estimate]` | `cost.js today` (default) / `cost.js estimate` |
-| `/banana edit <path> <instructions>` | reference-image conditioning (experimental, see below) — no separate edit path |
-| `/banana chat`, `/banana inspire`, `/banana setup` | not ported — see "Not implemented" |
-
-All generated images are saved under `~/.cf-image/output/` (override with
-`CF_IMAGE_HOME`) with a timestamp, model key, and a slug of the prompt in the
-filename — not inside the plugin's own installed directory, so it behaves
-correctly whether this was cloned locally or installed via a marketplace.
-Presets live under `~/.cf-image/presets/`.
-
-## Reference-image conditioning (confirmed on klein4b, experimental elsewhere)
-
-`--reference-image` (repeatable up to 4 times) maps to Cloudflare's
-documented `input_image_0`..`input_image_3` multipart fields. Only
-`klein4b`, `klein9b`, and `dev` accept it (multipart-format models);
-`phoenix`/`lucid`/`schnell` reject it client-side before any API call. This
-is how both "give me variations of this existing image" and "edit this
-image" style requests work — there's no separate edit endpoint.
-
-**Confirmed working on `klein4b`** (tested 2026-07-23): it faithfully
-preserves the reference image's subject/style while applying the requested
-change (verified with an illustration composited onto a new background per
-instructions) — genuine editing, not just inspiration. **Not free**: unlike
-plain `klein4b` generation, a reference-image call bills ~5.37 neurons per
-input image (matches Cloudflare's documented input-tile rate) — mention
-this if the user assumes klein4b is always free.
-
-`klein9b`/`dev` support is still **unconfirmed** (assumed by family
-similarity only) — tell the user explicitly if you use it on those two, and
-report back what happens so `references/models.md` can be updated.
-
-## Not implemented (by design, not oversight)
-
-- **Multi-turn "chat" sessions.** banana-claude has one, but it's a thin
-  wrapper with no unique logic of its own (pure delegation to an external
-  MCP server's session state) — Cloudflare Workers AI has no equivalent
-  session concept for image models to build on.
-- **A large "inspire" prompt-idea database.** banana-claude advertises
-  "2,500+ curated prompts" but doesn't actually bundle that data in its own
-  repo (confirmed by inspection) — not worth replicating an unverified
-  claim. Use the domain lenses above and `references/prompting.md` instead.
-- **`google/nano-banana-2-lite`** (routed through AI Gateway, not the
-  Workers AI neuron system). It returned HTTP 402 "insufficient balance" on
-  this account and needs either gateway balance or BYOK — out of scope for
-  this toolkit. See `references/models.md` for details if the user asks
-  about it specifically.
-- **Legacy SDXL/DreamShaper models** exist on the account but weren't priced
-  or tested this session — not in the catalog.
+All generated images save under `~/.cf-image/output/` (override with
+`CF_IMAGE_HOME`), named with a timestamp, model key, and a slug of the
+prompt. Presets live under `~/.cf-image/presets/`.
