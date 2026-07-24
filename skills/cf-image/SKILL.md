@@ -256,6 +256,32 @@ magic bytes, writes proper image files into `.cf-image/input/`, and prints
 ready-made `--reference-image` arguments. Verified bit-identical to the
 original, for ZIP and renamed-extension alike.
 
+**The user cannot know any of this.** They will paste an image and expect it
+to work — nobody reads a plugin README mid-task. So the moment it comes up,
+hand them the concrete fix instead of an architecture lecture. Two lines,
+no jargon:
+
+> I can see that image, but I can't use it as a reference — a pasted image
+> arrives without a file I can read. Quickest fix: **<the one line for their
+> surface>**. Or give me a direct link to it.
+
+The one line, by surface:
+- **Local session:** "type `@` and pick the file instead of pasting it."
+- **Cloud / mobile session:** "zip it and attach the `.zip` — or rename
+  `photo.jpg` to `photo.bin` before attaching."
+
+**Work out the surface yourself instead of asking.** If
+`/root/.claude/uploads/` exists you're in a cloud session; a Windows- or
+macOS-style home path in `pwd` means local. Only ask the user if that's
+genuinely inconclusive.
+
+Say this **before** they retry, and offer to proceed meanwhile with a
+described-only generation if they're in a hurry — their choice, not yours.
+
+And be proactive: if someone says they *want* to use their own photo before
+they've attached anything, give them the right method for their surface up
+front. That one sentence saves a failed round trip.
+
 The remaining routes, by convenience:
 
 1. **If the session runs on the user's own machine (CLI / desktop app):

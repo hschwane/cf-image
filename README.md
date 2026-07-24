@@ -56,6 +56,28 @@ about it.
 | Resize/crop/convert/make transparent | "crop this to a square" / "make the background transparent" |
 | Set up cf-image | "set up cf-image" — or just ask for an image; a failed first-run check walks you through it |
 
+## Giving cf-image one of your own images
+
+To edit your own photo or use it as a style/subject reference, the plugin
+needs the actual **file** — and **pasting an image into the chat doesn't
+provide one**. Attachments are routed by file extension: image extensions
+arrive as a picture Claude can look at but not read as data, while every
+other extension arrives as a real file. So:
+
+| Where you're working | Do this |
+|---|---|
+| Terminal / desktop app | Type `@` and pick the file instead of pasting it |
+| Web / mobile browser | Zip the image and attach the `.zip` — or rename `photo.jpg` to `photo.bin` before attaching |
+| Anywhere | Give a direct link: "use `https://…/photo.jpg` as reference" |
+
+With the zip/rename route, the skill runs `import-reference.js` for you,
+which restores a bit-identical image file — nothing is lost. If none of
+these are practical, the skill can still work from a description of the
+image, which reproduces the look but not the exact subject.
+
+You don't have to memorize this: if you paste an image, the skill tells you
+which of the above fits your setup.
+
 ## Install
 
 As a Claude Code plugin, from within Claude Code:

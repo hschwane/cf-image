@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.9.1 — 2026-07-24
+
+Closes the discoverability gap in 0.9.0: the mechanics worked, but a user
+had no way of learning them mid-task — nobody reads a plugin README while
+working, and the rules lived only in `SKILL.md`, which only Claude reads.
+
+- SKILL.md now prescribes **what to say to the user, when**: a two-line,
+  jargon-free message with the one concrete fix that fits their surface,
+  delivered the moment a pasted image can't be used — not an explanation of
+  attachment routing. Also: be proactive when someone announces they want to
+  use their own photo, and offer a described-only generation as a stopgap so
+  they aren't blocked while re-attaching.
+- Claude is told to **determine the surface itself** (`/root/.claude/uploads/`
+  present → cloud session; a local-style home path → local) instead of
+  asking the user which client they're on.
+- README gained a prominent user-facing section, "Giving cf-image one of
+  your own images", placed before Install rather than buried in Known
+  limitations, with a per-surface table.
+
 ## 0.9.0 — 2026-07-24
 
 Reference images now work in cloud sessions too.
