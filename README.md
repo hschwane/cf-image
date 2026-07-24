@@ -42,7 +42,7 @@ about it.
 |---|---|
 | Generate one image | "generate a logo for my app, featuring..." |
 | Edit an existing image | "using this image at `<path>`, change the background to a beach" |
-| Use one of your own images as reference | in a local session, reference it with `@` (path autocomplete): "`@photo.jpg` — use this as reference and put it on a beach". Pasting an image does *not* work; see Known limitations |
+| Use one of your own images as reference | local session: reference it with `@` (path autocomplete). Cloud session: attach it zipped or with a renamed extension. Pasting an image does *not* work — see Known limitations |
 | Use an online image as reference | "use `https://…/photo.jpg` as reference and put it on a beach" — URLs are downloaded automatically |
 | Keep refining a result across turns | "make the cat look less cartoony" — right after a previous generation, no special syntax needed |
 | Get several options to pick from | "give me 4 variations of a rocket ship icon" |
@@ -187,6 +187,7 @@ strengths/weaknesses per model, and prompting guidance live in
 | `generate.js` | Generate one image (supports `--aspect-ratio`, `--preset`, `--reference-image` up to 4x) |
 | `cost.js` | `today` (default): usage + remaining budget, warns at 60% used. `estimate --model <key> --count <n>`: cost of a planned generation, no API call |
 | `presets.js` | Manage saved brand/style presets (`list`/`show`/`create`/`delete`) |
+| `import-reference.js` | Turn an attached `.zip` or renamed image back into a real image file usable as a reference |
 
 There's no batch script — the skill generates variations by calling
 `generate.js` several times with genuinely different prompts (identical
@@ -211,15 +212,16 @@ usage/flags for each are documented in
 - **An image pasted or attached in the chat cannot be used as a reference
   image.** Claude Code passes attachments to the model as visual content
   only — they're never written to disk, so no script can read their bytes.
-  This applies to every surface (CLI, desktop, web, mobile). What to do
-  instead depends on where the session runs:
-  - **Local session** (terminal, desktop app): **use `@` to reference the
-    file instead of pasting it.** `@` passes the file's *path*, which is
-    exactly what's needed, and gives you autocomplete while typing.
-  - **Remote session** (web, mobile browser): your local files aren't
-    reachable from the sandbox at all, so `@` only sees files already in the
-    workspace. Use a **direct image URL** — it's downloaded automatically
-    and works the same everywhere — or add the image to the workspace/repo.
+  Attachments are routed by **file extension**: image extensions arrive
+  embedded (visible, but no file), every other extension arrives as a real
+  file with a readable path. Ways around it:
+  - **Zip the image, or rename its extension** (`photo.jpg` → `photo.bin`)
+    before attaching, then let the skill run `import-reference.js` on it —
+    that restores a bit-identical image file. Works in local *and* cloud
+    sessions, and is the most reliable route.
+  - **Local session** (terminal, desktop app): simply reference the file
+    with `@` instead of pasting it — `@` passes the file's *path*.
+  - **A direct image URL** works anywhere; it's downloaded automatically.
 
   Failing all of those, the skill can describe the attached image and
   generate without a reference, which reproduces the look but not the exact

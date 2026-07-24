@@ -227,21 +227,36 @@ same mechanism handles "give me variations of this existing image."
 
 ### Reference image pasted or attached in chat
 
-**An image pasted or attached in chat cannot be used as a reference image —
-on any surface.** Claude Code hands attachments to the model as visual
-content only; they are never written to the filesystem, so no script can
-read their bytes. This holds for the CLI, the desktop app, the web app and
-mobile alike. Don't promise otherwise, and don't go hunting for a cached
-copy in temp folders or app data — there isn't one.
+**Attachments are routed by FILE EXTENSION, not by content** — that single
+fact explains the whole situation, and contains the way around it:
 
-**And you cannot write the attachment out yourself.** You receive an
-attached image as perception, not as data — you have no access to its byte
-sequence. Any base64 you produced would be *invented*, yielding a corrupt
-file rather than an approximate image. Never attempt it. (The asymmetry:
-when a *script* reads a file, the script has the bytes; when *you* look at
-an image, nobody does.)
+- **Image extensions** (`.jpg`, `.png`, …) arrive *embedded in the message*.
+  You can see them; there is **no path and no bytes**. Unusable as a
+  reference, and you cannot write one out yourself: you receive it as
+  perception, not as data, so any base64 you produced would be *invented*
+  and yield a corrupt file. Never attempt that.
+- **Every other extension** arrives as a **real file with a path**, readable
+  byte-for-byte. In a cloud session these land under
+  `/root/.claude/uploads/<session-id>/<uuid>-<name>`.
 
-Say so plainly when it comes up, then offer these, in order:
+So the fix is to stop the image from *looking* like an image on the way in.
+
+**Preferred route — works in local and cloud sessions alike.** Ask the user
+to give the image a non-image extension, then normalize it back:
+
+1. **Zip it** (most robust): they attach `photo.zip`.
+2. **Or rename the extension** before attaching: `photo.jpg` → `photo.bin`.
+
+Then convert whatever arrived into a real image file:
+```bash
+node "<skill-dir>/scripts/import-reference.js" "<path of the attached file>"
+```
+It extracts every image from a ZIP, or recognizes a renamed image by its
+magic bytes, writes proper image files into `.cf-image/input/`, and prints
+ready-made `--reference-image` arguments. Verified bit-identical to the
+original, for ZIP and renamed-extension alike.
+
+The remaining routes, by convenience:
 
 1. **If the session runs on the user's own machine (CLI / desktop app):
    have them reference the file with `@` instead of pasting it.** Typing `@`
@@ -258,7 +273,8 @@ Say so plainly when it comes up, then offer these, in order:
    workspace/repo, so a photo from their own device is not there. Don't
    recommend `@` as if it were universal. If a path the user gives you
    doesn't exist, `generate.js` says so plainly — treat that as the signal
-   that you're in the remote case and move to option 2.
+   that you're in the remote case, and fall back to the zip/rename route
+   above or to a URL.
 2. **A direct image URL — the route that works on every surface**, and the
    primary one to suggest for web/mobile sessions.
    `--reference-image` accepts an `http(s)` URL and downloads it before
@@ -411,6 +427,10 @@ node scripts/generate.js --prompt "..." --preset acme
 # Accepts a local path OR a direct http(s) URL (downloaded to .cf-image/input/).
 node scripts/generate.js --prompt "..." --model klein4b --reference-image ./ref.jpg
 node scripts/generate.js --prompt "..." --model klein4b --reference-image "https://example.com/photo.jpg"
+
+# Turn an attached .zip / renamed image into a usable reference image file
+# (the way to get an image past the extension-based attachment routing)
+node scripts/import-reference.js "/root/.claude/uploads/<session>/<uuid>-photo.zip"
 
 # Manage presets
 node scripts/presets.js list

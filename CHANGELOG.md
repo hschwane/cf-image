@@ -3,6 +3,37 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.9.0 — 2026-07-24
+
+Reference images now work in cloud sessions too.
+
+The key fact, established by testing in a real cloud session: **attachments
+are routed by file extension, not by content.** Image extensions arrive
+embedded in the message with no path and no bytes; every other extension
+arrives as a real file with a readable path (under
+`/root/.claude/uploads/<session-id>/<uuid>-<name>` in the cloud). So an
+image only has to *not look like* an image on the way in.
+
+- **New `scripts/import-reference.js`**: turns whatever arrived back into a
+  real image file in `.cf-image/input/`, then prints ready-made
+  `--reference-image` arguments.
+  - Extracts every image from an attached `.zip` (hand-rolled ZIP reader
+    walking the central directory; STORED and DEFLATE via built-in `zlib` —
+    still zero dependencies).
+  - Detects an image whose extension was changed (`photo.jpg` → `photo.bin`)
+    by its magic bytes and restores the correct suffix.
+  - Rejects non-images with a clear message instead of writing junk.
+  - Verified: ZIP-extracted image is **bit-identical** to the original
+    (md5 match), renamed `.jpgc`/`.bin` files are recovered correctly,
+    JPEG/PNG/GIF/WebP detection all confirmed, and the extracted image was
+    used end to end as a reference for a real generation.
+- SKILL.md's reference-image section rewritten around the extension rule,
+  with the zip/rename route as the preferred, surface-independent option and
+  `@`/URL/describe as the remaining ladder.
+- Corrected an overstatement from 0.8.0: reference images from chat were
+  described as impossible in cloud sessions. They aren't — they just need
+  the file to arrive under a non-image extension.
+
 ## 0.8.0 — 2026-07-24
 
 Replaces 0.7.0's clipboard approach, which was wrong on three counts: it
