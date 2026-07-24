@@ -42,7 +42,7 @@ about it.
 |---|---|
 | Generate one image | "generate a logo for my app, featuring..." |
 | Edit an existing image | "using this image at `<path>`, change the background to a beach" |
-| Use one of your own images as reference | local session: reference it with `@` (path autocomplete). Cloud session: attach it zipped or with a renamed extension. Pasting an image does *not* work — see Known limitations |
+| Use one of your own images as reference | on your own machine: reference it with `@` (path autocomplete). In the web or the app: attach it with a renamed extension (`photo.bin`) or zipped. Pasting an image does *not* work — see "Giving cf-image one of your own images" |
 | Use an online image as reference | "use `https://…/photo.jpg` as reference and put it on a beach" — URLs are downloaded automatically |
 | Keep refining a result across turns | "make the cat look less cartoony" — right after a previous generation, no special syntax needed |
 | Get several options to pick from | "give me 4 variations of a rocket ship icon" |
@@ -66,14 +66,16 @@ other extension arrives as a real file. So:
 
 | Where you're working | Do this |
 |---|---|
-| Terminal / desktop app | Type `@` and pick the file instead of pasting it |
-| Web / mobile browser | Zip the image and attach the `.zip` — or rename `photo.jpg` to `photo.bin` before attaching |
+| A session on your own machine (terminal) | Type `@` and pick the file instead of pasting it |
+| Using Claude in the web or in the app | **Rename the file** — `photo.jpg` → `photo.bin` — and attach that. Any non-image extension works. Zipping the image and attaching the `.zip` does the same job and is handy for several images at once |
 | Anywhere | Give a direct link: "use `https://…/photo.jpg` as reference" |
 
-With the zip/rename route, the skill runs `import-reference.js` for you,
-which restores a bit-identical image file — nothing is lost. If none of
-these are practical, the skill can still work from a description of the
-image, which reproduces the look but not the exact subject.
+Renaming is usually the least effort: no tool required, and the skill runs
+`import-reference.js` for you afterwards, which restores a bit-identical
+image file — nothing is lost, the rename is purely to get it past the
+extension check. If none of these are practical, the skill can still work
+from a description of the image, which reproduces the look but not the exact
+subject.
 
 You don't have to memorize this: if you paste an image, the skill tells you
 which of the above fits your setup.
@@ -237,12 +239,12 @@ usage/flags for each are documented in
   Attachments are routed by **file extension**: image extensions arrive
   embedded (visible, but no file), every other extension arrives as a real
   file with a readable path. Ways around it:
-  - **Zip the image, or rename its extension** (`photo.jpg` → `photo.bin`)
+  - **Rename the extension** (`photo.jpg` → `photo.bin`) or zip the image
     before attaching, then let the skill run `import-reference.js` on it —
-    that restores a bit-identical image file. Works in local *and* cloud
-    sessions, and is the most reliable route.
-  - **Local session** (terminal, desktop app): simply reference the file
-    with `@` instead of pasting it — `@` passes the file's *path*.
+    that restores a bit-identical image file. Works everywhere and is the
+    most reliable route; renaming is usually the quickest.
+  - **Session on your own machine:** simply reference the file with `@`
+    instead of pasting it — `@` passes the file's *path*.
   - **A direct image URL** works anywhere; it's downloaded automatically.
 
   Failing all of those, the skill can describe the attached image and

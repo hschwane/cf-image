@@ -244,8 +244,11 @@ So the fix is to stop the image from *looking* like an image on the way in.
 **Preferred route — works in local and cloud sessions alike.** Ask the user
 to give the image a non-image extension, then normalize it back:
 
-1. **Zip it** (most robust): they attach `photo.zip`.
-2. **Or rename the extension** before attaching: `photo.jpg` → `photo.bin`.
+1. **Rename the extension** before attaching: `photo.jpg` → `photo.bin`.
+   Usually the *least* effort — no tool needed, just rename the file — so
+   suggest this first. Any non-image extension works; `.bin` is a safe pick.
+2. **Or zip it** and attach `photo.zip`. Slightly more work, but the most
+   robust option, and the natural choice for several images at once.
 
 Then convert whatever arrived into a real image file:
 ```bash
@@ -266,9 +269,11 @@ no jargon:
 > surface>**. Or give me a direct link to it.
 
 The one line, by surface:
-- **Local session:** "type `@` and pick the file instead of pasting it."
-- **Cloud / mobile session:** "zip it and attach the `.zip` — or rename
-  `photo.jpg` to `photo.bin` before attaching."
+- **Local session** (terminal / a session running on their own machine):
+  "type `@` and pick the file instead of pasting it."
+- **Cloud session** (using Claude in the web or in the app): "rename
+  `photo.jpg` to `photo.bin` and attach that — or zip it and attach the
+  `.zip`." Lead with the rename; it's usually less effort than zipping.
 
 **Work out the surface yourself instead of asking.** If
 `/root/.claude/uploads/` exists you're in a cloud session; a Windows- or

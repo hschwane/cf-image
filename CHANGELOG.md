@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.9.2 — 2026-07-24
+
+- **Renaming is now presented before zipping.** Giving the file a non-image
+  extension (`photo.jpg` → `photo.bin`) needs no tool at all, so it's the
+  lower-effort option for most people; zipping stays documented as the
+  robust choice and the natural one for several images at once.
+- **Clearer wording for which surface is which.** "Web / mobile browser"
+  became "using Claude in the web or in the app", and the local case is
+  described as a session running on the user's own machine, rather than by
+  naming clients — the session's location is what actually decides it.
+
 ## 0.9.1 — 2026-07-24
 
 Closes the discoverability gap in 0.9.0: the mechanics worked, but a user
