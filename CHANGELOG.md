@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 0.9.3 — 2026-07-24
+
+- **Image Reads must be sequential, never batched.** Several `Read` calls
+  issued together in one turn don't render for the user — only images read
+  one after another actually appear. This is now an explicit warning in the
+  MANDATORY display section, the Answering rules and the batch workflow,
+  flagged as overriding the general "batch independent tool calls for speed"
+  habit. It's the failure mode behind images that look fine from the
+  assistant's side while the user sees nothing, and it had happened in
+  testing here (a batch of five variations read in one go).
+- Noted that the gallery Artifact route sidesteps the limit entirely — a
+  second argument for it once the image count climbs.
+
 ## 0.9.2 — 2026-07-24
 
 - **Renaming is now presented before zipping.** Giving the file a non-image

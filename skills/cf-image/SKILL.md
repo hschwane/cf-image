@@ -25,6 +25,14 @@ what should work:
 1. **Read tool → renders the image inline.** Call `Read` on the saved file
    (absolute path). A `.jpg`/`.png` renders visibly, at a sensible size.
    **This is the default — do it for every generated image.**
+
+   ⚠️ **One at a time. Never batch image Reads.** Several `Read` calls
+   issued together in a single turn do **not** render for the user — only
+   images read individually, one after another, actually show up. This
+   **overrides** the general habit of batching independent tool calls for
+   speed: for images, sequential is the only thing that works. Confirmed
+   from real sessions, where a parallel batch of Reads left the user seeing
+   nothing at all while the images looked fine from the assistant's side.
 2. **Clickable link → use a working-directory-relative path.** Give the file
    as a markdown link whose href is relative to the working directory:
    `[20260723-klein4b-red-apple.jpg](.cf-image/output/20260723-klein4b-red-apple.jpg)`.
@@ -49,7 +57,10 @@ So use markdown embedding only when the Read route fails for that user.
 Above **~6 images at once**, don't dump them all inline — build an Artifact
 gallery: a numbered mini-portfolio with image, prompt and settings per
 entry, so the user can compare and pick. Generate the embedded base64 with a
-script, never by typing it out yourself. **Six or fewer: show them inline.**
+script, never by typing it out yourself. **Six or fewer: show them inline —
+reading them one at a time**, per the batching warning above. The gallery
+route sidesteps that limit entirely, which is a second reason to prefer it
+once the count climbs.
 
 Either way, the user sees real images — never just a list of paths.
 
@@ -411,7 +422,8 @@ After every generation:
 
 1. **Show the actual image inline** by calling Read on the output file —
    mandatory, and it comes first (see the MANDATORY section at the top).
-   Never answer with only a path.
+   With several images, Read them **one at a time**, never batched, or the
+   user sees none of them. Never answer with only a path.
 2. Give the file as a **clickable markdown link with the
    working-directory-relative path** (the `Saved (relative, ...)` line from
    `generate.js`), e.g.
